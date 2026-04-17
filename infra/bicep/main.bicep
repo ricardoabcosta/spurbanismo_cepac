@@ -53,7 +53,7 @@ param pgLocation string = 'eastus2'
 var acrName = 'cepacregistry'
 // Login server é previsível: {nome}.azurecr.io — evita referência dinâmica que falha na validação do ARM
 var acrLoginServer = '${acrName}.azurecr.io'
-var pgServerName = 'cepac-pg'
+var pgServerName = 'cepac-pgdb'
 var storageAccountName = 'cepacstorageacct'
 var blobContainerName = 'cepac-documentos'
 var logAnalyticsName = 'cepac-logs'

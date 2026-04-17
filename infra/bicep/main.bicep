@@ -37,11 +37,14 @@ param dbAdminLogin string
 @secure()
 param dbAdminPassword string
 
-@description('Tag de imagem do container (ex: sha-abc123)')
-param imageTag string = 'latest'
+@description('Tag de imagem do container (ex: sha-abc123). Use "placeholder" no deploy inicial — CI substitui pela imagem real.')
+param imageTag string = 'placeholder'
 
 @description('Region para todos os recursos')
 param location string = resourceGroup().location
+
+@description('Region para o PostgreSQL Flexible Server (pode diferir da região principal se houver restrição de cota)')
+param pgLocation string = 'eastus2'
 
 // ---------------------------------------------------------------------------
 // Variables
@@ -55,6 +58,11 @@ var storageAccountName = 'cepacstorageacct'
 var blobContainerName = 'cepac-documentos'
 var logAnalyticsName = 'cepac-logs'
 var containerEnvName = 'cepac-env'
+
+// Imagem placeholder (Container Apps Hello World) usada no deploy inicial enquanto
+// o ACR está vazio. O pipeline CI substitui com a imagem real via imageTag.
+var usePlaceholder = imageTag == 'placeholder'
+var placeholderImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
 // ---------------------------------------------------------------------------
 // Azure Container Registry
@@ -78,7 +86,7 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
 
 resource pgServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview' = {
   name: pgServerName
-  location: location
+  location: pgLocation
   sku: {
     name: 'Standard_B1ms'
     tier: 'Burstable'
@@ -212,7 +220,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ]
       }
-      registries: [
+      registries: usePlaceholder ? [] : [
         {
           server: acrLoginServer
           identity: 'system'
@@ -234,7 +242,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'cepac-api'
-          image: '${acrLoginServer}/cepac-api:${imageTag}'
+          image: usePlaceholder ? placeholderImage : '${acrLoginServer}/cepac-api:${imageTag}'
           resources: {
             cpu: json('0.5')
             memory: '1Gi'
@@ -338,7 +346,7 @@ resource portalApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ]
       }
-      registries: [
+      registries: usePlaceholder ? [] : [
         {
           server: acrLoginServer
           identity: 'system'
@@ -349,7 +357,7 @@ resource portalApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'cepac-portal'
-          image: '${acrLoginServer}/cepac-portal:${imageTag}'
+          image: usePlaceholder ? placeholderImage : '${acrLoginServer}/cepac-portal:${imageTag}'
           resources: {
             cpu: json('0.25')
             memory: '0.5Gi'
@@ -411,7 +419,7 @@ resource dashboardApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ]
       }
-      registries: [
+      registries: usePlaceholder ? [] : [
         {
           server: acrLoginServer
           identity: 'system'
@@ -422,7 +430,7 @@ resource dashboardApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'cepac-dashboard'
-          image: '${acrLoginServer}/cepac-dashboard:${imageTag}'
+          image: usePlaceholder ? placeholderImage : '${acrLoginServer}/cepac-dashboard:${imageTag}'
           resources: {
             cpu: json('0.25')
             memory: '0.5Gi'

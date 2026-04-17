@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "10576597388728530881"
+      "templateHash": "12036389712595969153"
     }
   },
   "parameters": {
@@ -35,9 +35,9 @@
     },
     "imageTag": {
       "type": "string",
-      "defaultValue": "latest",
+      "defaultValue": "placeholder",
       "metadata": {
-        "description": "Tag de imagem do container (ex: sha-abc123)"
+        "description": "Tag de imagem do container (ex: sha-abc123). Use \"placeholder\" no deploy inicial — CI substitui pela imagem real."
       }
     },
     "location": {
@@ -45,6 +45,13 @@
       "defaultValue": "[resourceGroup().location]",
       "metadata": {
         "description": "Region para todos os recursos"
+      }
+    },
+    "pgLocation": {
+      "type": "string",
+      "defaultValue": "eastus2",
+      "metadata": {
+        "description": "Region para o PostgreSQL Flexible Server (pode diferir da região principal se houver restrição de cota)"
       }
     }
   },
@@ -56,6 +63,8 @@
     "blobContainerName": "cepac-documentos",
     "logAnalyticsName": "cepac-logs",
     "containerEnvName": "cepac-env",
+    "usePlaceholder": "[equals(parameters('imageTag'), 'placeholder')]",
+    "placeholderImage": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
     "acrPullRoleId": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
   },
   "resources": [
@@ -76,7 +85,7 @@
       "type": "Microsoft.DBforPostgreSQL/flexibleServers",
       "apiVersion": "2023-06-01-preview",
       "name": "[variables('pgServerName')]",
-      "location": "[parameters('location')]",
+      "location": "[parameters('pgLocation')]",
       "sku": {
         "name": "Standard_B1ms",
         "tier": "Burstable"
@@ -212,12 +221,7 @@
               }
             ]
           },
-          "registries": [
-            {
-              "server": "[variables('acrLoginServer')]",
-              "identity": "system"
-            }
-          ],
+          "registries": "[if(variables('usePlaceholder'), createArray(), createArray(createObject('server', variables('acrLoginServer'), 'identity', 'system')))]",
           "secrets": [
             {
               "name": "database-url",
@@ -233,7 +237,7 @@
           "containers": [
             {
               "name": "cepac-api",
-              "image": "[format('{0}/cepac-api:{1}', variables('acrLoginServer'), parameters('imageTag'))]",
+              "image": "[if(variables('usePlaceholder'), variables('placeholderImage'), format('{0}/cepac-api:{1}', variables('acrLoginServer'), parameters('imageTag')))]",
               "resources": {
                 "cpu": "[json('0.5')]",
                 "memory": "1Gi"
@@ -337,18 +341,13 @@
               }
             ]
           },
-          "registries": [
-            {
-              "server": "[variables('acrLoginServer')]",
-              "identity": "system"
-            }
-          ]
+          "registries": "[if(variables('usePlaceholder'), createArray(), createArray(createObject('server', variables('acrLoginServer'), 'identity', 'system')))]"
         },
         "template": {
           "containers": [
             {
               "name": "cepac-portal",
-              "image": "[format('{0}/cepac-portal:{1}', variables('acrLoginServer'), parameters('imageTag'))]",
+              "image": "[if(variables('usePlaceholder'), variables('placeholderImage'), format('{0}/cepac-portal:{1}', variables('acrLoginServer'), parameters('imageTag')))]",
               "resources": {
                 "cpu": "[json('0.25')]",
                 "memory": "0.5Gi"
@@ -410,18 +409,13 @@
               }
             ]
           },
-          "registries": [
-            {
-              "server": "[variables('acrLoginServer')]",
-              "identity": "system"
-            }
-          ]
+          "registries": "[if(variables('usePlaceholder'), createArray(), createArray(createObject('server', variables('acrLoginServer'), 'identity', 'system')))]"
         },
         "template": {
           "containers": [
             {
               "name": "cepac-dashboard",
-              "image": "[format('{0}/cepac-dashboard:{1}', variables('acrLoginServer'), parameters('imageTag'))]",
+              "image": "[if(variables('usePlaceholder'), variables('placeholderImage'), format('{0}/cepac-dashboard:{1}', variables('acrLoginServer'), parameters('imageTag')))]",
               "resources": {
                 "cpu": "[json('0.25')]",
                 "memory": "0.5Gi"

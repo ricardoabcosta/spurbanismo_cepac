@@ -16,6 +16,10 @@
 
 BEGIN;
 
+-- cnpj_cpf foi criado como VARCHAR(20) em 003 mas a planilha tem registros
+-- com múltiplos CNPJs concatenados; ampliamos para TEXT sem perda de dados.
+ALTER TABLE proposta ALTER COLUMN cnpj_cpf TYPE TEXT;
+
 INSERT INTO proposta (codigo, numero_pa, tipo_processo, data_autuacao, status_pa, interessado, cnpj_cpf, endereco, setor_id, requerimento, area_terreno_m2)
 SELECT
     'AE-0200',

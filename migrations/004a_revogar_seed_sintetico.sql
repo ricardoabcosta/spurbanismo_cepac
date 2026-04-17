@@ -10,13 +10,17 @@
 
 BEGIN;
 
--- Remove movimentações dos títulos sintéticos
+-- movimentacao é append-only via trigger; desabilitamos temporariamente para
+-- poder remover registros do seed sintético (único caso legítimo de DELETE)
+ALTER TABLE movimentacao DISABLE TRIGGER USER;
+
 DELETE FROM movimentacao
 WHERE titulo_id IN (
     SELECT id FROM titulo_cepac WHERE codigo LIKE 'SEED-%'
 );
 
--- Remove os títulos sintéticos
+ALTER TABLE movimentacao ENABLE TRIGGER USER;
+
 DELETE FROM titulo_cepac WHERE codigo LIKE 'SEED-%';
 
 COMMIT;

@@ -83,7 +83,7 @@ services:
       AZURE_BLOB_ACCOUNT_KEY: ${AZURE_BLOB_ACCOUNT_KEY:-}
       AZURE_BLOB_CONTAINER_NAME: ${AZURE_BLOB_CONTAINER_NAME:-cepac-documentos}
     ports:
-      - "8000:8000"
+      - "8001:8000"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
       interval: 10s
@@ -103,7 +103,7 @@ services:
       api:
         condition: service_healthy
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://localhost:8001
       VITE_AZURE_CLIENT_ID: ${PORTAL_AZURE_CLIENT_ID:-}
       VITE_AZURE_TENANT_ID: ${AZURE_AD_TENANT_ID:-}
       VITE_DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-false}
@@ -123,7 +123,7 @@ services:
       api:
         condition: service_healthy
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://localhost:8001
       VITE_AZURE_CLIENT_ID: ${DASHBOARD_AZURE_CLIENT_ID:-}
       VITE_AZURE_TENANT_ID: ${AZURE_AD_TENANT_ID:-}
       VITE_DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-false}

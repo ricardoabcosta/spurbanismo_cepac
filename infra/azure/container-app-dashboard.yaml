@@ -1,0 +1,71 @@
+# =============================================================================
+# CEPAC — Azure Container Apps: Dashboard Executivo
+# Resource group: rg_spurbanismo_cepac | Region: East US
+# Subscription: 506f92c4-471f-4f5f-8b5c-9ff96ad5ce8c
+#
+# Deploy:
+#   az containerapp create \
+#     --resource-group rg_spurbanismo_cepac \
+#     --environment cepac-env \
+#     --yaml infra/azure/container-app-dashboard.yaml
+# =============================================================================
+
+apiVersion: 2024-03-01
+type: Microsoft.App/containerApps
+name: cepac-dashboard
+location: eastus
+
+properties:
+
+  managedEnvironmentId: /subscriptions/506f92c4-471f-4f5f-8b5c-9ff96ad5ce8c/resourceGroups/rg_spurbanismo_cepac/providers/Microsoft.App/managedEnvironments/cepac-env
+
+  configuration:
+
+    ingress:
+      external: true
+      targetPort: 3001
+      transport: http
+      allowInsecure: false
+      traffic:
+        - weight: 100
+          latestRevision: true
+
+    registries:
+      - server: <ACR_LOGIN_SERVER>
+        identity: system
+
+  template:
+
+    containers:
+      - name: cepac-dashboard
+        image: <ACR_LOGIN_SERVER>/cepac-dashboard:latest
+
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+
+        probes:
+          - type: liveness
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            failureThreshold: 3
+
+          - type: readiness
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            failureThreshold: 3
+
+    scale:
+      minReplicas: 1
+      maxReplicas: 2
+      rules:
+        - name: http-scaling
+          http:
+            metadata:
+              concurrentRequests: "30"

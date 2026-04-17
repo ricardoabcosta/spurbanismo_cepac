@@ -1,0 +1,47 @@
+# =============================================================================
+# CEPAC — Dockerfile Dashboard Executivo (React/Vite)
+# Base: node:20-alpine
+# Stage 1 (builder): instala dependências e gera build de produção
+# Stage 2 (runtime): serve os assets estáticos com nginx
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Stage 1 — builder
+# ---------------------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /app/dashboard
+
+# Copia apenas manifests primeiro para cache de camadas npm
+COPY frontend/dashboard/package.json frontend/dashboard/package-lock.json* ./
+
+RUN npm ci --prefer-offline
+
+# Copia o código-fonte e compila
+COPY frontend/dashboard/ .
+
+# Variáveis de build injetadas via --build-arg no pipeline
+ARG VITE_API_URL
+ARG VITE_AZURE_CLIENT_ID
+ARG VITE_AZURE_TENANT_ID
+
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_AZURE_CLIENT_ID=$VITE_AZURE_CLIENT_ID \
+    VITE_AZURE_TENANT_ID=$VITE_AZURE_TENANT_ID
+
+RUN npm run build
+
+# ---------------------------------------------------------------------------
+# Stage 2 — runtime (nginx)
+# ---------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS runtime
+
+RUN rm /etc/nginx/conf.d/default.conf
+
+COPY infra/nginx-spa-dashboard.conf /etc/nginx/conf.d/dashboard.conf
+
+COPY --from=builder /app/dashboard/dist /usr/share/nginx/html
+
+EXPOSE 3001
+
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,0 +1,321 @@
+# =============================================================================
+# CEPAC — CI Pipeline (Fase 2)
+# Stages:
+#   lint        — Ruff (Python)
+#   typecheck   — mypy (Python)
+#   test-unit   — pytest tests/unit/ (sem Docker)
+#   test-integ  — pytest tests/integration/ (testcontainers PostgreSQL)
+#   build-api   — Docker build/push cepac-api
+#   build-portal — npm build cepac-portal → Docker build/push
+#   build-dash  — npm build cepac-dashboard → Docker build/push
+#
+# Triggers:
+#   - push em qualquer branch
+#   - pull_request para main
+#
+# Build e push de imagens executam somente em push para main.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ${{ secrets.ACR_LOGIN_SERVER }}
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1 — Lint Python com Ruff
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (Ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff
+        run: ruff check src/ tests/ main.py
+
+  # ---------------------------------------------------------------------------
+  # Job 2 — Type check Python com mypy
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Type Check (mypy)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt mypy
+
+      - name: Run mypy
+        run: mypy src/ --ignore-missing-imports
+
+  # ---------------------------------------------------------------------------
+  # Job 3 — Testes unitários (sem banco, sem Docker)
+  # ---------------------------------------------------------------------------
+  test-unit:
+    name: Unit Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Run unit tests
+        run: pytest tests/unit/ -v --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Job 4 — Testes de integração (testcontainers PostgreSQL 15)
+  # ---------------------------------------------------------------------------
+  test-integration:
+    name: Integration Tests (testcontainers)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --tb=short
+        env:
+          # Testcontainers usa Docker local — disponível no ubuntu-latest
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+
+  # ---------------------------------------------------------------------------
+  # Job 5 — Build Portal (TypeScript + Vite)
+  # ---------------------------------------------------------------------------
+  build-portal-frontend:
+    name: Build Portal Frontend
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/portal/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend/portal
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend/portal
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: frontend/portal
+        run: npm run build
+        env:
+          VITE_API_URL: "https://placeholder.api"
+          VITE_AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
+          VITE_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+
+  # ---------------------------------------------------------------------------
+  # Job 6 — Build Dashboard (TypeScript + Vite)
+  # ---------------------------------------------------------------------------
+  build-dashboard-frontend:
+    name: Build Dashboard Frontend
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend/dashboard
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend/dashboard
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: frontend/dashboard
+        run: npm run build
+        env:
+          VITE_API_URL: "https://placeholder.api"
+          VITE_AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
+          VITE_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+
+  # ---------------------------------------------------------------------------
+  # Job 7 — Build imagem Docker da API
+  # Push para ACR somente em push para main.
+  # ---------------------------------------------------------------------------
+  build-api:
+    name: Build API Image
+    runs-on: ubuntu-latest
+    needs: [typecheck, test-unit, test-integration]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Extract metadata (API)
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/cepac-api
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build API (and push on main)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/Dockerfile
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Job 8 — Build imagem Docker do Portal
+  # ---------------------------------------------------------------------------
+  build-portal:
+    name: Build Portal Image
+    runs-on: ubuntu-latest
+    needs: [build-portal-frontend, test-unit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Extract metadata (Portal)
+        id: meta-portal
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/cepac-portal
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build Portal (and push on main)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/Dockerfile.portal
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          tags: ${{ steps.meta-portal.outputs.tags }}
+          labels: ${{ steps.meta-portal.outputs.labels }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_AZURE_CLIENT_ID=${{ secrets.PORTAL_AZURE_CLIENT_ID }}
+            VITE_AZURE_TENANT_ID=${{ secrets.AZURE_AD_TENANT_ID }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Job 9 — Build imagem Docker do Dashboard
+  # ---------------------------------------------------------------------------
+  build-dashboard:
+    name: Build Dashboard Image
+    runs-on: ubuntu-latest
+    needs: [build-dashboard-frontend, test-unit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Extract metadata (Dashboard)
+        id: meta-dash
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/cepac-dashboard
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build Dashboard (and push on main)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/Dockerfile.dashboard
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          tags: ${{ steps.meta-dash.outputs.tags }}
+          labels: ${{ steps.meta-dash.outputs.labels }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_AZURE_CLIENT_ID=${{ secrets.DASHBOARD_AZURE_CLIENT_ID }}
+            VITE_AZURE_TENANT_ID=${{ secrets.AZURE_AD_TENANT_ID }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "azureAdTenantId": {
+      "value": "f398df9c-fd0c-4829-a003-c770a1c4a063"
+    },
+    "azureAdClientId": {
+      "value": "AGUARDANDO_APP_REGISTRATION"
+    },
+    "dbAdminLogin": {
+      "value": "cepacadmin"
+    },
+    "imageTag": {
+      "value": "latest"
+    },
+    "location": {
+      "value": "eastus"
+    }
+  }
+}

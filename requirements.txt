@@ -1,0 +1,22 @@
+# =============================================================================
+# CEPAC — Dependências de produção
+# Python 3.12
+# =============================================================================
+
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# ORM + driver async
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+
+# Configuração via variáveis de ambiente
+pydantic-settings==2.6.1
+
+# Validação JWT com verificação de assinatura via JWKS do Azure AD (T12)
+# PyJWT 2.x inclui PyJWKClient para JWKS e suporte nativo a RS256
+PyJWT[crypto]==2.10.1
+
+# Azure Blob Storage — SAS token generation para upload/download de documentos (T13)
+azure-storage-blob==12.23.1

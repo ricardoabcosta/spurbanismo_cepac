@@ -1,0 +1,131 @@
+# =============================================================================
+# CEPAC — Docker Compose para desenvolvimento local
+# Serviços: postgres (15), api (FastAPI/uvicorn), migrate (Alembic/psql)
+#
+# Uso:
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# A ordem de inicialização é garantida por depends_on + healthcheck:
+#   postgres healthy → migrate (aplica migrations) → api
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Banco de dados PostgreSQL 15
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: cepac_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cepac
+      POSTGRES_PASSWORD: cepac
+      POSTGRES_DB: cepac
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cepac -d cepac"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Migrations + Seed
+  # Aplica 001_initial_schema.sql e 002_seed_abril_2026.sql via psql.
+  # Termina após execução (não fica em execução contínua).
+  # ---------------------------------------------------------------------------
+  migrate:
+    image: postgres:15-alpine
+    container_name: cepac_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: cepac
+    volumes:
+      - ../migrations:/migrations:ro
+    command: >
+      sh -c "
+        psql -h postgres -U cepac -d cepac -f /migrations/001_initial_schema.sql &&
+        psql -h postgres -U cepac -d cepac -f /migrations/002_seed_abril_2026.sql &&
+        psql -h postgres -U cepac -d cepac -f /migrations/003_fase2_schema.sql &&
+        psql -h postgres -U cepac -d cepac -f /migrations/004a_revogar_seed_sintetico.sql &&
+        psql -h postgres -U cepac -d cepac -f /migrations/004_carga_inicial_real.sql &&
+        psql -h postgres -U cepac -d cepac -f /migrations/005_portal_campos.sql &&
+        psql -h postgres -U cepac -d cepac -f /migrations/006_seed_medicao_inicial.sql &&
+        psql -h postgres -U cepac -d cepac -f /migrations/007_seed_parametros_sistema.sql
+      "
+    restart: on-failure
+
+  # ---------------------------------------------------------------------------
+  # API FastAPI / uvicorn
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: cepac_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cepac:cepac@postgres:5432/cepac
+      AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID:-}
+      AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID:-}
+      AZURE_BLOB_ACCOUNT_NAME: ${AZURE_BLOB_ACCOUNT_NAME:-}
+      AZURE_BLOB_ACCOUNT_KEY: ${AZURE_BLOB_ACCOUNT_KEY:-}
+      AZURE_BLOB_CONTAINER_NAME: ${AZURE_BLOB_CONTAINER_NAME:-cepac-documentos}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Portal de Operações Técnicas — React/Vite (dev mode)
+  # ---------------------------------------------------------------------------
+  portal:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.portal
+    container_name: cepac_portal
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: http://localhost:8000
+      VITE_AZURE_CLIENT_ID: ${PORTAL_AZURE_CLIENT_ID:-}
+      VITE_AZURE_TENANT_ID: ${AZURE_AD_TENANT_ID:-}
+    ports:
+      - "3000:3000"
+
+  # ---------------------------------------------------------------------------
+  # Dashboard Executivo — React/Vite (dev mode)
+  # ---------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dashboard
+    container_name: cepac_dashboard
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: http://localhost:8000
+      VITE_AZURE_CLIENT_ID: ${DASHBOARD_AZURE_CLIENT_ID:-}
+      VITE_AZURE_TENANT_ID: ${AZURE_AD_TENANT_ID:-}
+    ports:
+      - "3001:3001"
+
+volumes:
+  postgres_data:

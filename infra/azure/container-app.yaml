@@ -1,0 +1,108 @@
+# =============================================================================
+# CEPAC — Azure Container Apps manifest
+# Ambiente: produção (SP Urbanismo / Prodam)
+#
+# Pré-requisitos:
+#   - Azure Container Registry (ACR) com imagem publicada
+#   - Azure Container Apps Environment criado
+#   - Secret "database-url" cadastrado no Container App
+#
+# Deploy:
+#   az containerapp create \
+#     --resource-group <RG> \
+#     --environment <ENV_NAME> \
+#     --yaml infra/azure/container-app.yaml
+# =============================================================================
+
+apiVersion: 2024-03-01
+type: Microsoft.App/containerApps
+name: cepac-api
+location: brazilsouth
+
+properties:
+
+  # -------------------------------------------------------------------------
+  # Ambiente Container Apps (criado separadamente via az CLI ou Bicep)
+  # -------------------------------------------------------------------------
+  managedEnvironmentId: /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>/providers/Microsoft.App/managedEnvironments/<ENV_NAME>
+
+  configuration:
+
+    # -----------------------------------------------------------------------
+    # Ingress — HTTPS externo na porta 8000
+    # Azure APIM faz terminação TLS e encaminha para esta rota.
+    # -----------------------------------------------------------------------
+    ingress:
+      external: true
+      targetPort: 8000
+      transport: http
+      allowInsecure: false
+      traffic:
+        - weight: 100
+          latestRevision: true
+
+    # -----------------------------------------------------------------------
+    # Registro de imagem (ACR)
+    # -----------------------------------------------------------------------
+    registries:
+      - server: <ACR_LOGIN_SERVER>
+        identity: system
+
+    # -----------------------------------------------------------------------
+    # Secrets — referenciados nas env vars abaixo
+    # Cadastrar via:
+    #   az containerapp secret set --name cepac-api \
+    #     --secrets database-url=<CONN_STRING>
+    # -----------------------------------------------------------------------
+    secrets:
+      - name: database-url
+        keyVaultUrl: https://<KEY_VAULT_NAME>.vault.azure.net/secrets/cepac-database-url
+        identity: system
+
+  template:
+
+    # -----------------------------------------------------------------------
+    # Contêiner principal
+    # -----------------------------------------------------------------------
+    containers:
+      - name: cepac-api
+        image: <ACR_LOGIN_SERVER>/cepac-api:latest
+
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+
+        env:
+          - name: DATABASE_URL
+            secretRef: database-url
+
+        # Probe de liveness — reinicia o contêiner se /health não responder
+        probes:
+          - type: liveness
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+
+          # Probe de readiness — remove do balanceador até estar pronto
+          - type: readiness
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+    # -----------------------------------------------------------------------
+    # Escalonamento — entre 1 e 3 réplicas por carga HTTP
+    # -----------------------------------------------------------------------
+    scale:
+      minReplicas: 1
+      maxReplicas: 3
+      rules:
+        - name: http-scaling
+          http:
+            metadata:
+              concurrentRequests: "50"

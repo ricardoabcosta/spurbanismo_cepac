@@ -78,7 +78,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://cepac:cepac@postgres:5432/cepac
       AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID:-}
       AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID:-}
-      DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-false}
+      DEV_BYPASS_AUTH: "true"
       AZURE_BLOB_ACCOUNT_NAME: ${AZURE_BLOB_ACCOUNT_NAME:-}
       AZURE_BLOB_ACCOUNT_KEY: ${AZURE_BLOB_ACCOUNT_KEY:-}
       AZURE_BLOB_CONTAINER_NAME: ${AZURE_BLOB_CONTAINER_NAME:-cepac-documentos}

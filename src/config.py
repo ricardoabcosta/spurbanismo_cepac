@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # Ex: https://cepac-portal.xyz.eastus.azurecontainerapps.io,https://cepac-dashboard.xyz.eastus.azurecontainerapps.io
     cors_origins: str = "*"
 
+    # --- Dev bypass (apenas desenvolvimento local) ---
+    # DEV_BYPASS_AUTH=true → aceita requests sem token, injeta usuário hardcoded.
+    # NUNCA definir em produção.
+    dev_bypass_auth: bool = False
+
     # --- Azure Blob Storage (T13) ---
     azure_blob_account_name: Optional[str] = None
     azure_blob_account_key: Optional[str] = None

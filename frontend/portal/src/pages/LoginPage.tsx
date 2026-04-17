@@ -49,6 +49,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
+const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+
 export default function LoginPage() {
   const { instance } = useMsal();
   const isAuthenticated = useIsAuthenticated();
@@ -58,7 +60,7 @@ export default function LoginPage() {
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/solicitacoes";
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (DEV_BYPASS || isAuthenticated) {
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, from]);

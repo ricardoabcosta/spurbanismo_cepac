@@ -104,6 +104,40 @@ async def _upsert_usuario(session: AsyncSession, payload: TokenPayload) -> Usuar
 # Dependência principal
 # ---------------------------------------------------------------------------
 
+_DEV_BYPASS_UPN = "dev@bypass.local"
+_DEV_BYPASS_NOME = "Dev Bypass (local)"
+
+
+async def _get_dev_bypass_user(session: AsyncSession) -> UsuarioAutenticado:
+    """Upsert do usuário de bypass e retorno como TECNICO. Apenas em DEV_BYPASS_AUTH=true."""
+    from uuid import UUID as _UUID
+    from datetime import datetime, timezone, timedelta
+
+    stmt = select(Usuario).where(Usuario.upn == _DEV_BYPASS_UPN)
+    result = await session.execute(stmt)
+    usuario = result.scalar_one_or_none()
+
+    if usuario is None:
+        usuario = Usuario(
+            upn=_DEV_BYPASS_UPN,
+            nome=_DEV_BYPASS_NOME,
+            papel=PapelUsuarioEnum.TECNICO,
+            ativo=True,
+            last_login_at=datetime.now(tz=timezone.utc),
+        )
+        session.add(usuario)
+        await session.flush()
+    await session.commit()
+
+    return UsuarioAutenticado(
+        id=usuario.id,
+        upn=usuario.upn,
+        nome=usuario.nome,
+        papel=usuario.papel,
+        token_exp=datetime.now(tz=timezone.utc) + timedelta(hours=8),
+    )
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     session: AsyncSession = Depends(get_db),
@@ -114,6 +148,9 @@ async def get_current_user(
     Nunca retorna "desconhecido" — qualquer falha resulta em 401.
     Corrige o achado T8-1 da Fase 1.
     """
+    if settings.dev_bypass_auth:
+        return await _get_dev_bypass_user(session)
+
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -8,11 +8,14 @@ import axios, { type AxiosInstance } from "axios";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../authConfig";
 
+const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+
 // Instância singleton do MSAL — criada uma vez e exportada para uso no App.tsx
 export const msalInstance = new PublicClientApplication(msalConfig);
 
-// Inicializa o MSAL antes de qualquer outra coisa
-await msalInstance.initialize();
+if (!DEV_BYPASS) {
+  await msalInstance.initialize();
+}
 
 function buildAxiosInstance(): AxiosInstance {
   const instance = axios.create({
@@ -20,11 +23,14 @@ function buildAxiosInstance(): AxiosInstance {
     timeout: 30_000,
   });
 
+  if (DEV_BYPASS) {
+    return instance;
+  }
+
   // Interceptor de REQUEST — injeta Bearer token
   instance.interceptors.request.use(async (config) => {
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length === 0) {
-      // Não autenticado — deixa passar sem token (ProtectedRoute vai redirecionar)
       return config;
     }
 
@@ -35,7 +41,6 @@ function buildAxiosInstance(): AxiosInstance {
       });
       config.headers["Authorization"] = `Bearer ${result.accessToken}`;
     } catch {
-      // Token expirado ou erro silencioso → redireciona para login
       await msalInstance.loginRedirect(loginRequest);
     }
 
@@ -46,12 +51,8 @@ function buildAxiosInstance(): AxiosInstance {
   instance.interceptors.response.use(
     (response) => response,
     async (error: unknown) => {
-      if (
-        axios.isAxiosError(error) &&
-        error.response?.status === 401
-      ) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
         await msalInstance.loginRedirect(loginRequest);
-        // Promise pendente enquanto redireciona
         return new Promise(() => undefined);
       }
       return Promise.reject(error);

@@ -110,8 +110,7 @@ _DEV_BYPASS_NOME = "Dev Bypass (local)"
 
 async def _get_dev_bypass_user(session: AsyncSession) -> UsuarioAutenticado:
     """Upsert do usuário de bypass e retorno como TECNICO. Apenas em DEV_BYPASS_AUTH=true."""
-    from uuid import UUID as _UUID
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
 
     stmt = select(Usuario).where(Usuario.upn == _DEV_BYPASS_UPN)
     result = await session.execute(stmt)
@@ -123,7 +122,7 @@ async def _get_dev_bypass_user(session: AsyncSession) -> UsuarioAutenticado:
             nome=_DEV_BYPASS_NOME,
             papel=PapelUsuarioEnum.TECNICO,
             ativo=True,
-            last_login_at=datetime.now(tz=timezone.utc),
+            last_login_at=datetime.utcnow(),
         )
         session.add(usuario)
         await session.flush()

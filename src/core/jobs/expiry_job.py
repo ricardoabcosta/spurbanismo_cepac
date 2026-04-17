@@ -39,7 +39,7 @@ async def expirar_reservas(session: AsyncSession) -> int:
     Idempotente: o filtro por estado=EM_ANALISE garante que títulos já
     revertidos para DISPONIVEL não serão processados novamente.
     """
-    limite = datetime.now(timezone.utc) - timedelta(hours=TTL_HORAS)
+    limite = datetime.utcnow() - timedelta(hours=TTL_HORAS)
 
     stmt = select(TituloCepac).where(
         TituloCepac.estado == EstadoTituloEnum.EM_ANALISE,

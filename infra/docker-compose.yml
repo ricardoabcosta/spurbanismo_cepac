@@ -46,7 +46,7 @@ services:
     environment:
       PGPASSWORD: cepac
     volumes:
-      - ../migrations:/migrations
+      - ../migrations:/migrations:z
     command: >
       sh -c "
         psql -h postgres -U cepac -d cepac -f /migrations/001_initial_schema.sql &&

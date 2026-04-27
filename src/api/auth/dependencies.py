@@ -122,7 +122,7 @@ async def _get_dev_bypass_user(session: AsyncSession) -> UsuarioAutenticado:
             nome=_DEV_BYPASS_NOME,
             papel=PapelUsuarioEnum.TECNICO,
             ativo=True,
-            last_login_at=datetime.utcnow(),
+            last_login_at=datetime.now(tz=timezone.utc),
         )
         session.add(usuario)
         await session.flush()

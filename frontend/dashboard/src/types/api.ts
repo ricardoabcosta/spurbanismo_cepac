@@ -17,6 +17,10 @@ export interface OcupacaoSetor {
   estoque_total: string;
   consumido_r: string;
   consumido_nr: string;
+  consumido_r_aca: string;
+  consumido_nr_aca: string;
+  consumido_r_nuvem: string;
+  consumido_nr_nuvem: string;
   em_analise_r: string;
   em_analise_nr: string;
   disponivel: string;
@@ -31,6 +35,8 @@ export interface DashboardSnapshot {
   custo_total_incorrido: string;
   capacidade_total_operacao: string;
   saldo_geral_disponivel: string;
+  total_consumido_m2: string;
+  total_em_analise_m2: string;
   cepacs_em_circulacao: number;
   prazo_percentual_decorrido: number;
   prazo_dias_restantes: number;
@@ -47,4 +53,19 @@ export interface MedicaoObra {
   descricao: string | null;
   numero_processo_sei: string;
   created_at: string;
+}
+
+export interface CepacSetor {
+  nome: string;
+  cepacs_convertidos_aca: number;
+  cepacs_convertidos_parametros: number;
+  cepacs_desvinculados_aca: number;
+  cepacs_desvinculados_parametros: number;
+}
+
+export interface CepacSnapshot {
+  cepacs_totais: number;
+  cepacs_leiloados: number;
+  cepacs_colocacao_privada: number;
+  setores: CepacSetor[];
 }

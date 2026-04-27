@@ -21,10 +21,14 @@ from src.core.engine.rules_engine import RulesEngine
 # Engine SQLAlchemy (singleton de módulo)                                      #
 # --------------------------------------------------------------------------- #
 
+# pool_size=5 conexões persistentes + max_overflow=10 conexões extras sob carga.
 _engine = create_async_engine(
     settings.database_url,
     echo=False,
-    pool_pre_ping=True,
+    pool_pre_ping=False,
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=1800,
 )
 
 _AsyncSessionLocal = async_sessionmaker(
@@ -40,12 +44,7 @@ _AsyncSessionLocal = async_sessionmaker(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Provê uma AsyncSession por requisição.
-
-    A sessão é aberta no início e fechada (com rollback em caso de exceção)
-    ao término da requisição via context manager.
-    """
+    """Provê uma AsyncSession por requisição."""
     async with _AsyncSessionLocal() as session:
         try:
             yield session

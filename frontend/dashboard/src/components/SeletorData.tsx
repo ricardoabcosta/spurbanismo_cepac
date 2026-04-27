@@ -43,12 +43,6 @@ const SeletorData: React.FC<Props> = ({ isDiretor, dataHistorica, onDataChange }
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <label
-          htmlFor="data-historica"
-          style={{ fontSize: 13, color: "#555", fontWeight: 600 }}
-        >
-          Visualizar estado em:
-        </label>
         <input
           id="data-historica"
           type="date"

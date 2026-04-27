@@ -37,6 +37,9 @@ from .solicitacao_titulos import SolicitacaoTitulos
 from .solicitacao_vinculacao import SolicitacaoVinculacao
 from .titulo_cepac import TituloCepac
 
+# Config global
+from .configuracao_operacao import ConfiguracaoOperacao
+
 # Modelos — Fase 2
 from .certidao import Certidao
 from .documento_processo import DocumentoProcesso
@@ -73,4 +76,5 @@ __all__ = [
     "DocumentoProcesso",
     "MedicaoObra",
     "ParametroSistema",
+    "ConfiguracaoOperacao",
 ]

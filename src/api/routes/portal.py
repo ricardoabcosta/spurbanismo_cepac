@@ -5,11 +5,13 @@ Endpoints para técnicos cadastrarem solicitações, selecionarem títulos e
 consultarem propostas. Requer autenticação Azure AD (T12).
 
 Fluxo de solicitação:
-  POST /portal/solicitacoes → rules engine → PENDENTE (títulos EM_ANALISE)
+  POST /portal/solicitacoes → rules engine → EM_ANALISE (títulos EM_ANALISE)
   PATCH /portal/solicitacoes/{id}/cancelar → CANCELADA (títulos de volta a DISPONIVEL)
 
 Nenhuma lógica de negócio reside neste módulo — apenas orquestração.
 """
+import math
+from datetime import date
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -19,7 +21,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.auth.dependencies import UsuarioAutenticado, require_tecnico
 from src.api.dependencies import get_db, get_rules_engine
 from src.api.schemas.portal import (
+    CertidaoItem,
+    PaginacaoProposta,
     PaginacaoSolicitacaoOut,
+    PropostaListItem,
     PropostaPortalOut,
     SolicitacaoPortalDetalheOut,
     SolicitacaoPortalIn,
@@ -65,7 +70,7 @@ async def criar_solicitacao(
     3. Busca e valida títulos (devem ser DISPONIVEL)
     4. Valida proposta_codigo (se informado)
     5. Executa RulesEngine
-    6. Cria SolicitacaoVinculacao (PENDENTE) + SolicitacaoTitulos
+    6. Cria SolicitacaoVinculacao (EM_ANALISE) + SolicitacaoTitulos
     7. Transiciona títulos para EM_ANALISE
     """
     # Buscar setor
@@ -193,10 +198,10 @@ async def listar_solicitacoes(
         Optional[OrigemEnum], Query(description="Filtrar por origem ACA ou NUVEM")
     ] = None,
     data_inicio: Annotated[
-        Optional[str], Query(description="Data início (YYYY-MM-DD)")
+        Optional[date], Query(description="Data início (YYYY-MM-DD)")
     ] = None,
     data_fim: Annotated[
-        Optional[str], Query(description="Data fim (YYYY-MM-DD)")
+        Optional[date], Query(description="Data fim (YYYY-MM-DD)")
     ] = None,
     page: Annotated[int, Query(ge=1, description="Número da página")] = 1,
     page_size: Annotated[
@@ -303,7 +308,7 @@ async def detalhe_solicitacao(
     "/solicitacoes/{solicitacao_id}/cancelar",
     response_model=SolicitacaoPortalOut,
     status_code=status.HTTP_200_OK,
-    summary="Cancelar solicitação PENDENTE e liberar títulos",
+    summary="Cancelar solicitação EM_ANALISE (ou PENDENTE) e liberar títulos",
 )
 async def cancelar_solicitacao(
     solicitacao_id: UUID,
@@ -311,11 +316,11 @@ async def cancelar_solicitacao(
     current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
 ) -> SolicitacaoPortalOut:
     """
-    Cancela uma solicitação PENDENTE e reverte os títulos para DISPONIVEL.
+    Cancela uma solicitação EM_ANALISE e reverte os títulos para DISPONIVEL.
 
     - APROVADA → 422 SOLICITACAO_NAO_CANCELAVEL
     - CANCELADA/REJEITADA → 422 SOLICITACAO_NAO_CANCELAVEL
-    - PENDENTE → CANCELADA + títulos voltam a DISPONIVEL
+    - EM_ANALISE → CANCELADA + títulos voltam a DISPONIVEL
     """
     solicitacao = await portal_repository.buscar_por_id(session, solicitacao_id)
     if solicitacao is None:
@@ -324,7 +329,8 @@ async def cancelar_solicitacao(
             detail=f"Solicitação {solicitacao_id} não encontrada.",
         )
 
-    if solicitacao.status != StatusSolicitacaoEnum.PENDENTE:
+    _cancelaveis = {StatusSolicitacaoEnum.PENDENTE, StatusSolicitacaoEnum.EM_ANALISE}
+    if solicitacao.status not in _cancelaveis:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -405,6 +411,78 @@ async def listar_titulos_disponiveis(
 
 
 # ---------------------------------------------------------------------------
+# GET /portal/propostas
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/propostas",
+    response_model=PaginacaoProposta,
+    status_code=200,
+    summary="Listar propostas (AE-XXXX) com paginação",
+)
+async def listar_propostas(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    page: Annotated[int, Query(ge=1, description="Número da página")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Itens por página")] = 20,
+    setor_id: Annotated[Optional[UUID], Query(description="Filtrar por UUID do setor")] = None,
+    status_pa: Annotated[
+        Optional[str], Query(description="Filtrar por status: ANALISE | DEFERIDO | INDEFERIDO")
+    ] = None,
+    data_inicio: Annotated[
+        Optional[date], Query(description="Data proposta início (YYYY-MM-DD)")
+    ] = None,
+    data_fim: Annotated[
+        Optional[date], Query(description="Data proposta fim (YYYY-MM-DD)")
+    ] = None,
+    situacao_certidao: Optional[str] = Query(
+        None, description="ANALISE | VALIDA | CANCELADA"
+    ),
+) -> PaginacaoProposta:
+    """
+    Lista propostas com paginação e filtros opcionais.
+
+    Não expõe CPF/CNPJ — use GET /portal/propostas/{codigo} para o detalhe completo.
+    """
+    items, total = await portal_repository.listar_propostas(
+        session=session,
+        page=page,
+        page_size=page_size,
+        setor_id=setor_id,
+        status_pa=status_pa,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        situacao_certidao=situacao_certidao,
+    )
+
+    total_pages = max(1, math.ceil(total / page_size))
+
+    items_out = [
+        PropostaListItem(
+            id=p.id,
+            codigo=p.codigo,
+            setor=p.setor.nome,
+            interessado=p.interessado,
+            uso_aca=p.uso_aca,
+            cepac_total=p.cepac_total,
+            status_pa=p.status_pa.value,
+            data_proposta=p.data_proposta,
+            requerimento=p.requerimento.value,
+            situacao_certidao=p.situacao_certidao,
+        )
+        for p in items
+    ]
+
+    return PaginacaoProposta(
+        items=items_out,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
+
+
+# ---------------------------------------------------------------------------
 # GET /portal/propostas/{codigo}
 # ---------------------------------------------------------------------------
 
@@ -431,20 +509,44 @@ async def buscar_proposta(
             detail=f"Proposta '{codigo}' não encontrada.",
         )
 
-    return PropostaPortalOut(
-        id=proposta.id,
-        codigo=proposta.codigo,
-        numero_pa=proposta.numero_pa,
-        tipo_processo=proposta.tipo_processo.value if proposta.tipo_processo else None,
-        data_autuacao=str(proposta.data_autuacao) if proposta.data_autuacao else None,
-        status_pa=proposta.status_pa.value,
-        interessado=proposta.interessado,
-        cnpj_cpf=proposta.cnpj_cpf,
-        endereco=proposta.endereco,
-        setor=proposta.setor.nome,
-        requerimento=proposta.requerimento.value,
-        area_terreno_m2=proposta.area_terreno_m2,
-        observacao_alteracao=proposta.observacao_alteracao,
-        created_at=proposta.created_at,
-        updated_at=proposta.updated_at,
-    )
+    # Montar dicionário com campos que requerem conversão explícita (enums → str)
+    # e depois deixar from_attributes resolver o restante dos campos da migration 012.
+    data = {k: v for k, v in proposta.__dict__.items() if not k.startswith("_")}
+    data["tipo_processo"] = proposta.tipo_processo.value if proposta.tipo_processo else None
+    data["data_autuacao"] = str(proposta.data_autuacao) if proposta.data_autuacao else None
+    data["status_pa"] = proposta.status_pa.value
+    data["requerimento"] = proposta.requerimento.value
+    data["setor"] = proposta.setor.nome
+
+    # Montar certidões vinculadas (carregadas via selectinload em buscar_proposta_por_codigo)
+    certidoes_out = [
+        CertidaoItem(
+            id=c.id,
+            numero_certidao=c.numero_certidao,
+            tipo=c.tipo.value,
+            data_emissao=c.data_emissao,
+            situacao=c.situacao.value,
+            numero_processo_sei=c.numero_processo_sei,
+            uso_aca=c.uso_aca,
+            aca_r_m2=c.aca_r_m2,
+            aca_nr_m2=c.aca_nr_m2,
+            aca_total_m2=c.aca_total_m2,
+            tipo_contrapartida=c.tipo_contrapartida,
+            valor_oodc_rs=c.valor_oodc_rs,
+            cepac_aca=c.cepac_aca,
+            cepac_parametros=c.cepac_parametros,
+            cepac_total=c.cepac_total,
+            nuvem_r_m2=c.nuvem_r_m2,
+            nuvem_nr_m2=c.nuvem_nr_m2,
+            nuvem_total_m2=c.nuvem_total_m2,
+            nuvem_cepac=c.nuvem_cepac,
+            contribuinte_sq=c.contribuinte_sq,
+            contribuinte_lote=c.contribuinte_lote,
+            obs=c.obs,
+            created_at=c.created_at,
+        )
+        for c in proposta.certidoes
+    ]
+    data["certidoes"] = certidoes_out
+
+    return PropostaPortalOut.model_validate(data)

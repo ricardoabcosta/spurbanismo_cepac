@@ -17,12 +17,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.auth.dependencies import UsuarioAutenticado, require_diretor, require_tecnico
 from src.core.models.enums import PapelUsuarioEnum
 from src.api.dependencies import get_db
+from sqlalchemy import select
+
 from src.api.schemas.dashboard import (
     AlertaSetorialOut,
+    CepacSetorOut,
+    CepacSnapshotOut,
     DashboardSnapshotOut,
+    GraficosOut,
     MedicaoOut,
     OcupacaoSetorOut,
 )
+from src.core.models.configuracao_operacao import ConfiguracaoOperacao
+from src.core.models.setor import Setor
 from src.core.repositories import dashboard_repository
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -68,6 +75,8 @@ async def snapshot(
         custo_total_incorrido=dados["custo_total_incorrido"],
         capacidade_total_operacao=dados["capacidade_total_operacao"],
         saldo_geral_disponivel=dados["saldo_geral_disponivel"],
+        total_consumido_m2=dados["total_consumido_m2"],
+        total_em_analise_m2=dados["total_em_analise_m2"],
         cepacs_em_circulacao=dados["cepacs_em_circulacao"],
         prazo_percentual_decorrido=dados["prazo_percentual_decorrido"],
         prazo_dias_restantes=dados["prazo_dias_restantes"],
@@ -82,6 +91,10 @@ async def snapshot(
                 estoque_total=s.estoque_total,
                 consumido_r=s.consumido_r,
                 consumido_nr=s.consumido_nr,
+                consumido_r_aca=s.consumido_r_aca,
+                consumido_nr_aca=s.consumido_nr_aca,
+                consumido_r_nuvem=s.consumido_r_nuvem,
+                consumido_nr_nuvem=s.consumido_nr_nuvem,
                 em_analise_r=s.em_analise_r,
                 em_analise_nr=s.em_analise_nr,
                 disponivel=s.disponivel,
@@ -118,6 +131,10 @@ async def setores(
             estoque_total=s.estoque_total,
             consumido_r=s.consumido_r,
             consumido_nr=s.consumido_nr,
+            consumido_r_aca=s.consumido_r_aca,
+            consumido_nr_aca=s.consumido_nr_aca,
+            consumido_r_nuvem=s.consumido_r_nuvem,
+            consumido_nr_nuvem=s.consumido_nr_nuvem,
             em_analise_r=s.em_analise_r,
             em_analise_nr=s.em_analise_nr,
             disponivel=s.disponivel,
@@ -177,3 +194,59 @@ async def medicoes(
     """
     registros = await dashboard_repository.listar_medicoes(session)
     return [MedicaoOut.model_validate(m) for m in registros]
+
+
+# ---------------------------------------------------------------------------
+# GET /dashboard/cepac
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/cepac",
+    response_model=CepacSnapshotOut,
+    status_code=status.HTTP_200_OK,
+    summary="Snapshot de CEPACs emitidos e por setor",
+)
+async def cepac_snapshot(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+) -> CepacSnapshotOut:
+    """Retorna totais globais de CEPACs e os parâmetros de conversão/desvinculação por setor."""
+    cfg_result = await session.execute(
+        select(ConfiguracaoOperacao).where(ConfiguracaoOperacao.id == 1)
+    )
+    cfg = cfg_result.scalar_one_or_none()
+
+    setores_result = await session.execute(
+        select(Setor).where(Setor.ativo == True).order_by(Setor.nome)
+    )
+    setores = setores_result.scalars().all()
+
+    return CepacSnapshotOut(
+        cepacs_totais=cfg.cepacs_totais if cfg else 0,
+        cepacs_leiloados=cfg.cepacs_leiloados if cfg else 0,
+        cepacs_colocacao_privada=cfg.cepacs_colocacao_privada if cfg else 0,
+        setores=[CepacSetorOut.model_validate(s) for s in setores],
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /dashboard/graficos
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/graficos",
+    response_model=GraficosOut,
+    status_code=status.HTTP_200_OK,
+    summary="Dados para os 7 gráficos analíticos do dashboard",
+)
+async def graficos(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+) -> GraficosOut:
+    """
+    Retorna um único objeto com os dados consolidados para todos os gráficos analíticos:
+    evolução temporal, ACA vs Parâmetros, status de propostas, distribuição por uso,
+    top 10 setores, histograma de tempo de análise e scatter área x CEPACs.
+    """
+    dados = await dashboard_repository.montar_graficos(session)
+    return GraficosOut(**dados)

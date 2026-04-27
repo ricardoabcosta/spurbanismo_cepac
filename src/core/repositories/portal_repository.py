@@ -7,13 +7,15 @@ Sem lógica de negócio — apenas acesso a dados.
 from __future__ import annotations
 
 import math
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
+from src.core.models.certidao import Certidao
 from src.core.models.enums import (
     EstadoTituloEnum,
     OrigemEnum,
@@ -43,7 +45,7 @@ async def criar_solicitacao(
     observacao: Optional[str] = None,
 ) -> SolicitacaoVinculacao:
     """
-    Cria um registro em solicitacao_vinculacao (status=PENDENTE) e os
+    Cria um registro em solicitacao_vinculacao (status=EM_ANALISE) e os
     registros de junção em solicitacao_titulos.
 
     Não faz commit — responsabilidade da camada de rota.
@@ -55,7 +57,7 @@ async def criar_solicitacao(
         area_m2=area_m2,
         quantidade_cepacs=len(titulo_dtos),
         numero_processo_sei=numero_processo_sei,
-        status=StatusSolicitacaoEnum.PENDENTE,
+        status=StatusSolicitacaoEnum.EM_ANALISE,
         proposta_id=proposta_id,
         observacao=observacao,
     )
@@ -106,8 +108,8 @@ async def listar_paginado(
     status: Optional[StatusSolicitacaoEnum] = None,
     uso: Optional[UsoEnum] = None,
     origem: Optional[OrigemEnum] = None,
-    data_inicio: Optional[str] = None,
-    data_fim: Optional[str] = None,
+    data_inicio: Optional[date] = None,
+    data_fim: Optional[date] = None,
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[SolicitacaoVinculacao], int, int]:
@@ -180,6 +182,64 @@ async def cancelar(
 
 
 # ---------------------------------------------------------------------------
+# Propostas — listagem paginada
+# ---------------------------------------------------------------------------
+
+async def listar_propostas(
+    session: AsyncSession,
+    page: int = 1,
+    page_size: int = 20,
+    setor_id: Optional[UUID] = None,
+    status_pa: Optional[str] = None,
+    data_inicio: Optional[date] = None,
+    data_fim: Optional[date] = None,
+    situacao_certidao: Optional[str] = None,
+) -> tuple[list[Proposta], int]:
+    """
+    Lista propostas com filtros opcionais, paginadas.
+
+    Carrega Proposta.setor via selectinload para evitar N+1.
+    Retorna (items, total).
+    """
+    stmt_base = (
+        select(Proposta)
+        .options(joinedload(Proposta.setor))
+    )
+    count_base = select(func.count()).select_from(Proposta)
+
+    if setor_id is not None:
+        stmt_base = stmt_base.where(Proposta.setor_id == setor_id)
+        count_base = count_base.where(Proposta.setor_id == setor_id)
+
+    if status_pa is not None:
+        stmt_base = stmt_base.where(Proposta.status_pa == status_pa)
+        count_base = count_base.where(Proposta.status_pa == status_pa)
+
+    if data_inicio is not None:
+        stmt_base = stmt_base.where(Proposta.data_proposta >= data_inicio)
+        count_base = count_base.where(Proposta.data_proposta >= data_inicio)
+
+    if data_fim is not None:
+        stmt_base = stmt_base.where(Proposta.data_proposta <= data_fim)
+        count_base = count_base.where(Proposta.data_proposta <= data_fim)
+
+    if situacao_certidao is not None:
+        stmt_base = stmt_base.where(Proposta.situacao_certidao == situacao_certidao)
+        count_base = count_base.where(Proposta.situacao_certidao == situacao_certidao)
+
+    total_result = await session.execute(count_base)
+    total = total_result.scalar_one()
+
+    offset = (page - 1) * page_size
+    stmt_base = stmt_base.order_by(Proposta.codigo.asc()).limit(page_size).offset(offset)
+
+    result = await session.execute(stmt_base)
+    items = list(result.scalars().all())
+
+    return items, total
+
+
+# ---------------------------------------------------------------------------
 # Proposta por código
 # ---------------------------------------------------------------------------
 
@@ -195,7 +255,10 @@ async def buscar_proposta_por_codigo(
     result = await session.execute(
         select(Proposta)
         .where(Proposta.codigo == codigo)
-        .options(selectinload(Proposta.setor))
+        .options(
+            joinedload(Proposta.setor),
+            selectinload(Proposta.certidoes),
+        )
     )
     return result.scalar_one_or_none()
 

@@ -5,14 +5,16 @@ import type { AxiosError } from "axios";
 import apiClient from "./client";
 import type {
   TituloDisponivel,
-  SolicitacaoIn,
-  SolicitacaoOut,
-  SolicitacaoDetalhe,
-  PaginacaoSolicitacao,
-  PropostaPortal,
-  FiltrosSolicitacao,
+  PropostaIn,
+  PropostaOut,
+  PropostaDetalhe,
+  PaginacaoProposta,
+  PropostaAEOut,
+  FiltrosPropostas,
   FiltrosTitulos,
   ErroNegocio,
+  PaginacaoPropostaList,
+  SetorBasico,
 } from "../types/api";
 
 // ---------------------------------------------------------------------------
@@ -34,7 +36,7 @@ export async function listarTitulosDisponiveis(
 }
 
 // ---------------------------------------------------------------------------
-// Solicitações
+// Propostas
 // ---------------------------------------------------------------------------
 
 export interface ErroNegocioError extends Error {
@@ -47,11 +49,11 @@ function isErroNegocioError(e: unknown): e is ErroNegocioError {
 
 export { isErroNegocioError };
 
-export async function criarSolicitacao(
-  payload: SolicitacaoIn
-): Promise<SolicitacaoOut> {
+export async function criarProposta(
+  payload: PropostaIn
+): Promise<PropostaOut> {
   try {
-    const { data } = await apiClient.post<SolicitacaoOut>(
+    const { data } = await apiClient.post<PropostaOut>(
       "/portal/solicitacoes",
       payload
     );
@@ -67,9 +69,9 @@ export async function criarSolicitacao(
   }
 }
 
-export async function listarSolicitacoes(
-  filtros: FiltrosSolicitacao = {}
-): Promise<PaginacaoSolicitacao> {
+export async function listarPropostas(
+  filtros: FiltrosPropostas = {}
+): Promise<PaginacaoProposta> {
   const params = new URLSearchParams();
   params.set("page", String(filtros.page ?? 1));
   params.set("page_size", String(filtros.page_size ?? 20));
@@ -78,22 +80,22 @@ export async function listarSolicitacoes(
   if (filtros.uso) params.set("uso", filtros.uso);
   if (filtros.origem) params.set("origem", filtros.origem);
 
-  const { data } = await apiClient.get<PaginacaoSolicitacao>(
+  const { data } = await apiClient.get<PaginacaoProposta>(
     `/portal/solicitacoes?${params.toString()}`
   );
   return data;
 }
 
-export async function buscarSolicitacao(id: string): Promise<SolicitacaoDetalhe> {
-  const { data } = await apiClient.get<SolicitacaoDetalhe>(
+export async function buscarProposta(id: string): Promise<PropostaDetalhe> {
+  const { data } = await apiClient.get<PropostaDetalhe>(
     `/portal/solicitacoes/${id}`
   );
   return data;
 }
 
-export async function cancelarSolicitacao(id: string): Promise<SolicitacaoOut> {
+export async function cancelarProposta(id: string): Promise<PropostaOut> {
   try {
-    const { data } = await apiClient.patch<SolicitacaoOut>(
+    const { data } = await apiClient.patch<PropostaOut>(
       `/portal/solicitacoes/${id}/cancelar`
     );
     return data;
@@ -109,12 +111,41 @@ export async function cancelarSolicitacao(id: string): Promise<SolicitacaoOut> {
 }
 
 // ---------------------------------------------------------------------------
-// Proposta
+// Proposta AE-XXXX
 // ---------------------------------------------------------------------------
 
-export async function buscarProposta(codigo: string): Promise<PropostaPortal> {
-  const { data } = await apiClient.get<PropostaPortal>(
+export async function buscarPropostaAE(codigo: string): Promise<PropostaAEOut> {
+  const { data } = await apiClient.get<PropostaAEOut>(
     `/portal/propostas/${encodeURIComponent(codigo)}`
   );
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Listagem paginada de propostas AE-XXXX
+// ---------------------------------------------------------------------------
+
+export async function listarPropostasAE(params: {
+  page?: number;
+  page_size?: number;
+  setor_id?: string;
+  status_pa?: string;
+  situacao_certidao?: string;
+}): Promise<PaginacaoPropostaList> {
+  const qs = new URLSearchParams();
+  qs.set("page", String(params.page ?? 1));
+  qs.set("page_size", String(params.page_size ?? 20));
+  if (params.setor_id) qs.set("setor_id", params.setor_id);
+  if (params.status_pa) qs.set("status_pa", params.status_pa);
+  if (params.situacao_certidao) qs.set("situacao_certidao", params.situacao_certidao);
+
+  const { data } = await apiClient.get<PaginacaoPropostaList>(
+    `/portal/propostas?${qs.toString()}`
+  );
+  return data;
+}
+
+export async function listarSetores(): Promise<SetorBasico[]> {
+  const { data } = await apiClient.get<SetorBasico[]>("/admin/setores");
   return data;
 }

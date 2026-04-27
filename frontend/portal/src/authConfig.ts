@@ -13,5 +13,5 @@ export const msalConfig: Configuration = {
 };
 
 export const loginRequest: PopupRequest = {
-  scopes: [`api://${import.meta.env.VITE_AZURE_CLIENT_ID as string}/CEPAC.Access`],
+  scopes: [`api://${import.meta.env.VITE_AZURE_API_CLIENT_ID as string}/CEPAC.Acesso`],
 };

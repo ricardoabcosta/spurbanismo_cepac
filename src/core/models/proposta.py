@@ -5,14 +5,14 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from sqlalchemy import Enum as SAEnum, ForeignKey, Numeric, String, Text, text
+from sqlalchemy import Date, Enum as SAEnum, ForeignKey, Integer, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
-from .enums import RequerimentoEnum, StatusPaEnum, TipoProcessoEnum
+from .enums import RequerimentoEnum, StatusPaEnum, TipoProcessoEnum, UsoEnum
 
 if TYPE_CHECKING:
     from .certidao import Certidao
@@ -75,6 +75,53 @@ class Proposta(Base):
 
     # Preenchido quando certidão de alteração tem área diferente — D7
     observacao_alteracao: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Campos migration 012 ---
+
+    # Datas e classificação do interessado
+    data_proposta: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    tipo_interessado: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)   # 'PF' ou 'PJ'
+
+    # Documentos do interessado (separados de cnpj_cpf legado)
+    cnpj: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cpf: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Contribuinte / lote
+    contribuinte_sq: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    contribuinte_lote: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Uso ACA — R, NR ou MISTO
+    uso_aca: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+
+    # Áreas ACA em m²
+    aca_r_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_nr_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_total_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+
+    # Contrapartida e OODC
+    tipo_contrapartida: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    valor_oodc_rs: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+
+    # CEPACs calculados
+    cepac_aca: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cepac_parametros: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cepac_total: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Certidão emitida
+    certidao: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    situacao_certidao: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    data_certidao: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Áreas NUVEM em m²
+    nuvem_r_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    nuvem_nr_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    nuvem_total_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    nuvem_cepac: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Controle interno
+    obs: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resp_data: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    cross_check: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # --- Auditoria ---
     created_at: Mapped[datetime] = mapped_column(

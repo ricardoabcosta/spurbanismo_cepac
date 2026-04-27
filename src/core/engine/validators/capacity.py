@@ -4,8 +4,9 @@ Validator de capacidade global da Operação Urbana Consorciada Água Espraiada.
 Aplica o teto máximo de emissão de CEPACs, descontada a reserva técnica,
 sobre o consumo total acumulado de todos os setores combinados.
 
-Aplica-se apenas a solicitações NR; solicitações R não são limitadas por
-este teto global (são controladas por reserva setorial em Chucri Zaidan).
+Aplica-se apenas à parcela NR da solicitação; a parcela R não é limitada
+por este teto global (é controlada por reserva setorial em Chucri Zaidan).
+Para uso=MISTO, apenas metade da área (a parcela NR) é contabilizada.
 """
 from decimal import Decimal
 from typing import Optional
@@ -20,17 +21,22 @@ LIMITE_OPERACAO  = CAPACIDADE_TOTAL - RESERVA_TECNICA   # 4.600.000,00 m²
 
 def validar(solicitacao: SolicitacaoDTO) -> Optional[RulesError]:
     """
-    Retorna RulesError se a solicitação NR ultrapassar o limite global da operação.
+    Retorna RulesError se a parcela NR da solicitação ultrapassar o limite global.
+
+    Para uso=NR  : toda a area_m2 é contabilizada como NR.
+    Para uso=MISTO: apenas area_nr_m2 (50%) é contabilizada contra o teto global.
+    Para uso=R   : parcela NR é zero — validator retorna None imediatamente.
 
     O campo consumo_total_global do SaldoSetorDTO representa a soma de
     todos os setores e deve ser pré-calculado pelo repositório antes de
     instanciar o DTO.
     """
-    if solicitacao.uso != "NR":
+    area_nr = solicitacao.area_nr_m2
+    if area_nr == Decimal("0.00"):
         return None
 
     saldo = solicitacao.saldo_setor
-    projetado = saldo.consumo_total_global + solicitacao.area_m2
+    projetado = saldo.consumo_total_global + area_nr
 
     if projetado > LIMITE_OPERACAO:
         saldo_disponivel = LIMITE_OPERACAO - saldo.consumo_total_global

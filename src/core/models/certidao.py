@@ -4,10 +4,11 @@ Modelo SQLAlchemy para a tabela `certidao`.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING
+from decimal import Decimal
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from sqlalchemy import Enum as SAEnum, ForeignKey, String, Text, text
+from sqlalchemy import Enum as SAEnum, ForeignKey, Integer, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -47,7 +48,14 @@ class Certidao(Base):
         String(20), nullable=False, unique=True
     )
     tipo: Mapped[TipoCertidaoEnum] = mapped_column(
-        SAEnum(TipoCertidaoEnum, name="tipo_certidao_enum", native_enum=True),
+        # values_callable garante que SQLAlchemy use os .value (acentuados: VINCULAÇÃO…)
+        # e não os .name (VINCULACAO…) como chave de lookup — necessário no Python 3.12.
+        SAEnum(
+            TipoCertidaoEnum,
+            name="tipo_certidao_enum",
+            native_enum=True,
+            values_callable=lambda x: [i.value for i in x],
+        ),
         nullable=False,
     )
     data_emissao: Mapped[date | None] = mapped_column(nullable=True)
@@ -60,6 +68,38 @@ class Certidao(Base):
         nullable=False,
         server_default=text("'VALIDA'"),
     )
+
+    # --- Campos migration 013: dados da planilha por linha ---
+
+    # Uso ACA
+    uso_aca: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+
+    # Áreas ACA em m²
+    aca_r_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_nr_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_total_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+
+    # Contrapartida e OODC
+    tipo_contrapartida: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    valor_oodc_rs: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+
+    # CEPACs calculados
+    cepac_aca: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cepac_parametros: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cepac_total: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Áreas NUVEM em m²
+    nuvem_r_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    nuvem_nr_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    nuvem_total_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    nuvem_cepac: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Contribuinte / lote
+    contribuinte_sq: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    contribuinte_lote: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Observações livres
+    obs: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # --- Auditoria ---
     created_at: Mapped[datetime] = mapped_column(

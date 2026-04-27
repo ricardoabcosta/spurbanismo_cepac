@@ -14,11 +14,12 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+import sqlalchemy
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.routes import certidoes, dashboard, documentos, medicoes, movimentacoes, portal, saldo, solicitacoes, titulos
+from src.api.routes import admin, certidoes, dashboard, documentos, medicoes, movimentacoes, portal, saldo, solicitacoes, titulos
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,32 @@ async def lifespan(app: FastAPI):
 
     _AsyncSessionLocal = _session_local
 
+    # Pré-aquece o pool: exercita UUID/Numeric/Enum para forçar OID cache do asyncpg
+    from src.api.dependencies import _AsyncSessionLocal as _SL
+    import sys
+
+    _WARMUP_SQL = sqlalchemy.text(
+        "SELECT p.id, p.codigo, p.status_pa, p.cepac_total, p.setor_id, "
+        "c.id, c.tipo, c.situacao, c.cepac_total, c.aca_r_m2 "
+        "FROM proposta p "
+        "LEFT JOIN certidao c ON c.proposta_id = p.id "
+        "LIMIT 3"
+    )
+
+    async def _warm_worker():
+        async with _SL() as s:
+            await s.execute(_WARMUP_SQL)
+
+    try:
+        results = await asyncio.gather(*[_warm_worker() for _ in range(3)], return_exceptions=True)
+        erros = [r for r in results if isinstance(r, Exception)]
+        if erros:
+            print(f"[CEPAC] pre-warming erros: {erros}", file=sys.stderr, flush=True)
+        else:
+            print("[CEPAC] pool pre-aquecido (UUID+Numeric+Enum).", file=sys.stderr, flush=True)
+    except Exception as exc:
+        print(f"[CEPAC] falha no pre-warming: {exc}", file=sys.stderr, flush=True)
+
     logger.info("CEPAC: iniciando job de expiração TTL em background.")
     task = asyncio.create_task(_run_expiry_job_loop())
 
@@ -142,7 +169,7 @@ _cors_origins = [o.strip() for o in settings.cors_origins.split(",")]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -150,6 +177,7 @@ app.add_middleware(
 # Registro dos routers                                                          #
 # --------------------------------------------------------------------------- #
 
+app.include_router(admin.router)
 app.include_router(solicitacoes.router)
 app.include_router(saldo.router)
 app.include_router(movimentacoes.router)

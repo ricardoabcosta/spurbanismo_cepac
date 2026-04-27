@@ -8,9 +8,10 @@ import enum
 
 
 class UsoEnum(str, enum.Enum):
-    """Uso do título/solicitação: Residencial ou Não-Residencial."""
+    """Uso do título/solicitação: Residencial, Não-Residencial ou Misto."""
     R = "R"
     NR = "NR"
+    MISTO = "MISTO"
 
 
 class OrigemEnum(str, enum.Enum):
@@ -30,6 +31,7 @@ class EstadoTituloEnum(str, enum.Enum):
 class StatusSolicitacaoEnum(str, enum.Enum):
     """Status de uma solicitação de vinculação."""
     PENDENTE = "PENDENTE"
+    EM_ANALISE = "EM_ANALISE"
     APROVADA = "APROVADA"
     REJEITADA = "REJEITADA"
     CANCELADA = "CANCELADA"
@@ -64,6 +66,7 @@ class SituacaoCertidaoEnum(str, enum.Enum):
     """Situação de uma certidão."""
     VALIDA = "VALIDA"
     CANCELADA = "CANCELADA"
+    ANALISE = "ANALISE"
 
 
 class PapelUsuarioEnum(str, enum.Enum):

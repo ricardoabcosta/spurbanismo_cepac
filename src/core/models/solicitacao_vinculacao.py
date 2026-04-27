@@ -64,7 +64,7 @@ class SolicitacaoVinculacao(Base):
     status: Mapped[StatusSolicitacaoEnum] = mapped_column(
         SAEnum(StatusSolicitacaoEnum, name="status_solicitacao_enum", native_enum=True),
         nullable=False,
-        server_default=text("'PENDENTE'"),
+        server_default=text("'EM_ANALISE'"),
     )
 
     # Obrigatório quando status = REJEITADA (CHECK de consistência no banco)

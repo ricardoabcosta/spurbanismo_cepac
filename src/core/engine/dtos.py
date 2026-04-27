@@ -17,7 +17,7 @@ class TituloDTO:
     """Snapshot de um título CEPAC para validação. Sem dependência de ORM."""
     id: UUID
     setor: str
-    uso: Literal["R", "NR"]
+    uso: Literal["R", "NR", "MISTO"]
     origem: Literal["ACA", "NUVEM"]
     estado: Literal["DISPONIVEL", "EM_ANALISE", "CONSUMIDO", "QUARENTENA"]
     valor_m2: Decimal
@@ -54,13 +54,43 @@ class SaldoSetorDTO:
 class SolicitacaoDTO:
     """Dados de uma solicitação de vinculação submetida ao motor de regras."""
     setor: str
-    uso: Literal["R", "NR"]
+    uso: Literal["R", "NR", "MISTO"]
     origem: Literal["ACA", "NUVEM"]
     area_m2: Decimal
     numero_processo_sei: str
     titulo_ids: list[UUID]
     titulos: list[TituloDTO]        # snapshots dos títulos do lote
     saldo_setor: SaldoSetorDTO      # pré-calculado pelo repositório
+
+    @property
+    def area_nr_m2(self) -> Decimal:
+        """
+        Parcela NR efectiva desta solicitação.
+
+        - uso == "NR"   → 100% da área
+        - uso == "MISTO" → 50% da área (divisão igualitária R+NR)
+        - uso == "R"    → 0
+        """
+        if self.uso == "NR":
+            return self.area_m2
+        if self.uso == "MISTO":
+            return (self.area_m2 / 2).quantize(Decimal("0.01"))
+        return Decimal("0.00")
+
+    @property
+    def area_r_m2(self) -> Decimal:
+        """
+        Parcela R efectiva desta solicitação.
+
+        - uso == "R"    → 100% da área
+        - uso == "MISTO" → 50% da área (divisão igualitária R+NR)
+        - uso == "NR"   → 0
+        """
+        if self.uso == "R":
+            return self.area_m2
+        if self.uso == "MISTO":
+            return (self.area_m2 / 2).quantize(Decimal("0.01"))
+        return Decimal("0.00")
 
 
 @dataclass

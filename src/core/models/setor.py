@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Numeric, String, text
+from sqlalchemy import Boolean, Integer, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -47,10 +47,26 @@ class Setor(Base):
     teto_nr_m2: Mapped[Decimal] = mapped_column(
         Numeric(15, 2), nullable=False
     )
+    teto_r_m2: Mapped[Decimal | None] = mapped_column(
+        Numeric(15, 2), nullable=True
+    )
     # NULL em todos os setores exceto Chucri Zaidan (216.442,47 m²)
     reserva_r_m2: Mapped[Decimal | None] = mapped_column(
         Numeric(15, 2), nullable=True
     )
+    # Percentual mínimo de R no total consumido (ex: 30.00 = 30%). NULL = sem restrição.
+    piso_r_percentual: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2), nullable=True
+    )
+    cepacs_convertidos_aca: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cepacs_convertidos_parametros: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cepacs_desvinculados_aca: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cepacs_desvinculados_parametros: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # --- Controle ---
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Bloqueia 100% de novas solicitações NR (ex: Berrini com estoque NR esgotado)
+    bloqueio_nr: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # --- Auditoria ---
     created_at: Mapped[datetime] = mapped_column(

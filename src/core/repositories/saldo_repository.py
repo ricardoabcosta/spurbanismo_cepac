@@ -37,9 +37,7 @@ async def calcular_saldo(
     # Montar filtro de data: até o fim do dia solicitado (23:59:59 UTC)
     data_limite: Optional[datetime] = None
     if data_referencia is not None:
-        data_limite = datetime.combine(data_referencia, time.max).replace(
-            tzinfo=timezone.utc
-        )
+        data_limite = datetime.combine(data_referencia, time.max)  # naive — TIMESTAMP WITHOUT TIME ZONE
 
     # ------------------------------------------------------------------ #
     # Query de saldo do setor                                              #

@@ -8,9 +8,11 @@ import { MsalProvider } from "@azure/msal-react";
 import { msalInstance } from "./api/client";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
-import SolicitacoesPage from "./pages/SolicitacoesPage";
-import NovaSolicitacaoPage from "./pages/NovaSolicitacaoPage";
-import DetalhesSolicitacaoPage from "./pages/DetalhesSolicitacaoPage";
+import PropostasPage from "./pages/PropostasPage";
+import NovaPropostaPage from "./pages/NovaPropostaPage";
+import DetalhesPropostaPage from "./pages/DetalhesPropostaPage";
+import SetoresAdminPage from "./pages/SetoresAdminPage";
+import DashboardPage from "./pages/DashboardPage";
 
 const App: React.FC = () => (
   <MsalProvider instance={msalInstance}>
@@ -19,32 +21,50 @@ const App: React.FC = () => (
         <Route path="/login" element={<LoginPage />} />
 
         <Route
-          path="/solicitacoes"
+          path="/propostas"
           element={
             <ProtectedRoute>
-              <SolicitacoesPage />
+              <PropostasPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/solicitacoes/nova"
+          path="/propostas/nova"
           element={
             <ProtectedRoute>
-              <NovaSolicitacaoPage />
+              <NovaPropostaPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/solicitacoes/:id"
+          path="/propostas/:codigo"
           element={
             <ProtectedRoute>
-              <DetalhesSolicitacaoPage />
+              <DetalhesPropostaPage />
             </ProtectedRoute>
           }
         />
 
-        {/* Rota padrão → lista de solicitações */}
-        <Route path="*" element={<Navigate to="/solicitacoes" replace />} />
+        <Route
+          path="/admin/setores"
+          element={
+            <ProtectedRoute>
+              <SetoresAdminPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Rota padrão → lista de propostas */}
+        <Route path="*" element={<Navigate to="/propostas" replace />} />
       </Routes>
     </BrowserRouter>
   </MsalProvider>

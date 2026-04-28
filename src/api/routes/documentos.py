@@ -65,6 +65,8 @@ async def solicitar_upload_url(
 
     blob_path = gerar_blob_path(payload.nome_arquivo)
 
+    assert settings.azure_blob_account_name is not None
+    assert settings.azure_blob_account_key is not None
     sas = gerar_sas_upload(
         blob_path=blob_path,
         content_type=payload.content_type,
@@ -122,6 +124,8 @@ async def obter_download_url(
             detail=f"Documento {documento_id} não encontrado.",
         )
 
+    assert settings.azure_blob_account_name is not None
+    assert settings.azure_blob_account_key is not None
     sas = gerar_sas_download(
         blob_path=doc.blob_path,
         account_name=settings.azure_blob_account_name,

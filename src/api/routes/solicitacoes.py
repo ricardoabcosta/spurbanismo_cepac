@@ -84,6 +84,7 @@ async def criar_solicitacao(
     # 5b. Reprovado
     if not resultado.aprovado:
         erro = resultado.erro
+        assert erro is not None
         corpo_erro = ErroNegocioOut(
             codigo_erro=erro.codigo,
             mensagem=erro.mensagem,

@@ -14,7 +14,7 @@ class TituloOut(BaseModel):
 
     id: UUID
     setor: str
-    uso: Literal["R", "NR"]
+    uso: Literal["R", "NR", "MISTO"]
     origem: Literal["ACA", "NUVEM"]
     estado: Literal["DISPONIVEL", "EM_ANALISE", "CONSUMIDO", "QUARENTENA"]
     valor_m2: Decimal

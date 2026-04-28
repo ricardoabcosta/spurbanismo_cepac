@@ -9,7 +9,7 @@ Autenticação:
   - DIRETOR apenas: /snapshot?data=YYYY-MM-DD (histórico), /medicoes
 """
 from datetime import date
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -169,7 +169,7 @@ async def alertas(
     ocupacao = await dashboard_repository.calcular_ocupacao_setores(session, setores=setores_orm)
     dtos = dashboard_repository.calcular_alertas(ocupacao, setores_orm)
     return [
-        AlertaSetorialOut(setor=a.setor, tipo=a.tipo, mensagem=a.mensagem)
+        AlertaSetorialOut(setor=a.setor, tipo=cast(Literal["TETO_NR_EXCEDIDO", "RESERVA_R_VIOLADA"], a.tipo), mensagem=a.mensagem)
         for a in dtos
     ]
 

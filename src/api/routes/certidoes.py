@@ -7,7 +7,7 @@ Endpoint restrito: dados completos da proposta (TECNICO/DIRETOR).
 O número da certidão usa barra como separador (ex: AE-001/2024),
 que na URL deve ser codificado como %2F — FastAPI decodifica automaticamente.
 """
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ from src.core.repositories import certidao_repository
 router = APIRouter(prefix="/certidoes", tags=["certidoes"])
 
 
-def _autenticidade(situacao: SituacaoCertidaoEnum) -> str:
+def _autenticidade(situacao: SituacaoCertidaoEnum) -> Literal["CERTIDÃO AUTÊNTICA", "CERTIDÃO CANCELADA"]:
     """Mapeia situação da certidão para o texto de autenticidade."""
     if situacao == SituacaoCertidaoEnum.VALIDA:
         return "CERTIDÃO AUTÊNTICA"

@@ -12,7 +12,10 @@ executado em background a cada 30 minutos via asyncio nativo.
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator, Optional
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import sqlalchemy
 from fastapi import FastAPI, Request, status
@@ -34,9 +37,9 @@ async def _get_async_session() -> AsyncGenerator:
     Cria e retorna um context manager de AsyncSession reutilizando o engine
     já configurado em dependencies.py, evitando duplicação de configuração.
     """
-    from src.api.dependencies import _AsyncSessionLocal
+    from src.api.dependencies import _AsyncSessionLocal as _SLF
 
-    async with _AsyncSessionLocal() as session:
+    async with _SLF() as session:
         yield session
 
 
@@ -56,6 +59,7 @@ async def _run_expiry_job_loop() -> None:
 
     while True:
         try:
+            assert _AsyncSessionLocal is not None
             async with _AsyncSessionLocal() as session:
                 count = await expirar_reservas(session)
                 if count > 0:
@@ -76,7 +80,7 @@ def _get_session_local():
 
 
 # Referência ao session maker — resolvida uma única vez no lifespan
-_AsyncSessionLocal = None
+_AsyncSessionLocal: Optional["async_sessionmaker[AsyncSession]"] = None
 
 
 # --------------------------------------------------------------------------- #

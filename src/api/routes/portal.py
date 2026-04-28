@@ -105,6 +105,7 @@ async def criar_solicitacao(
 
     if not resultado.aprovado:
         erro = resultado.erro
+        assert erro is not None
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={

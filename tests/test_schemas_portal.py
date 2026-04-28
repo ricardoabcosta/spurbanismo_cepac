@@ -247,8 +247,8 @@ class TestRepositoryStatusPadrao:
         # Garante que PENDENTE não é o valor atribuído ao status na criação
         # (pode aparecer em comentários; checamos a linha de atribuição)
         linhas_com_status = [
-            l.strip() for l in source.splitlines()
-            if "status=" in l and "StatusSolicitacaoEnum" in l
+            linha.strip() for linha in source.splitlines()
+            if "status=" in linha and "StatusSolicitacaoEnum" in linha
         ]
         assert linhas_com_status, "Deve haver ao menos uma linha com status=StatusSolicitacaoEnum.*"
         for linha in linhas_com_status:

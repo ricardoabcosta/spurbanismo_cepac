@@ -9,7 +9,6 @@ Sem dependência de banco, ORM ou FastAPI.
 from decimal import Decimal
 from uuid import uuid4
 
-import pytest
 
 from src.core.engine.dtos import SaldoSetorDTO, SolicitacaoDTO, TituloDTO
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
 
 from src.core.repositories.dashboard_repository import (
     calcular_velocimetro,
@@ -49,10 +48,6 @@ class TestCalcularVelocimetro:
 
     def test_zona_verde_antes_de_60_pct(self) -> None:
         # 50% → VERDE
-        dias_50pct = int(_DIAS_TOTAIS * 0.50)
-        data = date(2004, 1, 1).replace(
-            year=2004 + dias_50pct // 365
-        )  # aproximação
         pct, _, zona = calcular_velocimetro(date(2016, 7, 2))  # ~50%
         assert zona == "VERDE"
         assert pct < 60.0

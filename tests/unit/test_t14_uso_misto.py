@@ -9,7 +9,6 @@ Premissa: uso=MISTO divide area_m2 igualmente (50% NR + 50% R).
 from decimal import Decimal
 from uuid import uuid4
 
-import pytest
 
 from src.core.engine.dtos import SaldoSetorDTO, SolicitacaoDTO, TituloDTO
 from tests.conftest import make_solicitacao

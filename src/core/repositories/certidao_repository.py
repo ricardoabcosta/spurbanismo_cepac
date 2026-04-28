@@ -15,7 +15,6 @@ from sqlalchemy.orm import selectinload
 from src.core.models.certidao import Certidao
 from src.core.models.enums import SituacaoCertidaoEnum, TipoCertidaoEnum
 from src.core.models.proposta import Proposta
-from src.core.models.setor import Setor
 
 
 async def buscar_por_numero(

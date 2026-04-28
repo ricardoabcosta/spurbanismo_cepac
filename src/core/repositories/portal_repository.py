@@ -15,7 +15,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from src.core.models.certidao import Certidao
 from src.core.models.enums import (
     EstadoTituloEnum,
     OrigemEnum,

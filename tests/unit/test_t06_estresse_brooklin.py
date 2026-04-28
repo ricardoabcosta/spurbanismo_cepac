@@ -12,7 +12,6 @@ Cenário: 5 solicitações NR sequenciais no Brooklin.
 from decimal import Decimal
 from uuid import uuid4
 
-import pytest
 
 from src.core.engine.dtos import SaldoSetorDTO, TituloDTO
 from tests.conftest import make_solicitacao

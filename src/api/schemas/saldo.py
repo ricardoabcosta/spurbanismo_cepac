@@ -3,9 +3,8 @@ Schemas Pydantic v2 para o endpoint GET /saldo/{setor}.
 """
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class SaldoOut(BaseModel):

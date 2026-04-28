@@ -5,7 +5,7 @@ Todos os tipos são dataclasses imutáveis (frozen=True) sem dependência de ORM
 FastAPI ou qualquer I/O. O RulesEngine recebe estes objetos como parâmetros e
 nunca acessa o banco diretamente.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from datetime import datetime
 from uuid import UUID

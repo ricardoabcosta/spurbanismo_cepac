@@ -5,7 +5,6 @@ Verificações:
 - UsoEnum.MISTO existe e vale "MISTO"
 - StatusSolicitacaoEnum.EM_ANALISE existe e vale "EM_ANALISE"
 """
-import pytest
 
 from src.core.models.enums import StatusSolicitacaoEnum, UsoEnum
 

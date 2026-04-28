@@ -80,7 +80,6 @@ class TestSolicitacaoPortalInValidacao:
         assert "numero_processo_sei" in fields
 
     def test_area_m2_positiva_aceita(self) -> None:
-        sol = self._make("7810.2026/0000001-0")
         # Usa merge de dict para substituir area_m2 sem duplicar o kwarg
         sol_custom = SolicitacaoPortalIn(
             **{**self._BASE_PAYLOAD, "area_m2": "999.99"},

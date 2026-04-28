@@ -13,7 +13,7 @@ Idempotente: a query filtra por estado=EM_ANALISE, portanto
 executar o job mais de uma vez não produz duplicatas.
 """
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

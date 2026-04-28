@@ -217,7 +217,7 @@ async def cepac_snapshot(
     cfg = cfg_result.scalar_one_or_none()
 
     setores_result = await session.execute(
-        select(Setor).where(Setor.ativo == True).order_by(Setor.nome)
+        select(Setor).where(Setor.ativo).order_by(Setor.nome)
     )
     setores = setores_result.scalars().all()
 

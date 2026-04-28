@@ -7,7 +7,6 @@ Todos os valores de área em Decimal — nunca float.
 import pytest
 from decimal import Decimal
 from uuid import uuid4
-from datetime import datetime, timezone
 
 from src.core.engine.dtos import SaldoSetorDTO, TituloDTO, SolicitacaoDTO
 from src.core.engine.rules_engine import RulesEngine

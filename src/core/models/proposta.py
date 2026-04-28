@@ -12,7 +12,7 @@ from sqlalchemy import Date, Enum as SAEnum, ForeignKey, Integer, Numeric, Strin
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
-from .enums import RequerimentoEnum, StatusPaEnum, TipoProcessoEnum, UsoEnum
+from .enums import RequerimentoEnum, StatusPaEnum, TipoProcessoEnum
 
 if TYPE_CHECKING:
     from .certidao import Certidao

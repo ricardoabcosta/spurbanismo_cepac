@@ -14,7 +14,6 @@ from uuid import uuid4
 import pytest
 
 from src.core.engine.dtos import SaldoSetorDTO, SolicitacaoDTO, TituloDTO
-from tests.conftest import make_solicitacao
 
 
 @pytest.fixture

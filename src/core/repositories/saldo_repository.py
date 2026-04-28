@@ -6,7 +6,7 @@ Sempre derivado do histórico de movimentações (append-only).
 
 Suporta consulta point-in-time via `data_referencia` para auditoria CVM/TCM.
 """
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Optional
 

@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      target: "esnext",
+    },
     server: {
       port: 3001,
       proxy: {

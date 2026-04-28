@@ -1,6 +1,3 @@
-/**
- * LoginPage — exibida quando o usuário não está autenticado.
- */
 import React from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../authConfig";
@@ -15,64 +12,117 @@ const LoginPage: React.FC = () => {
   return (
     <div
       style={{
+        minHeight: "100vh",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        height: "100vh",
-        gap: 24,
-        background: "#f4f5f7",
+        background: "#f0f4f8",
+        fontFamily: "system-ui, sans-serif",
       }}
     >
       <div
         style={{
-          background: "#fff",
-          borderRadius: 12,
-          padding: "48px 40px",
-          boxShadow: "0 4px 16px rgba(0,0,0,.12)",
-          textAlign: "center",
-          maxWidth: 380,
           width: "100%",
+          maxWidth: 420,
+          borderRadius: 10,
+          overflow: "hidden",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.14)",
         }}
       >
-        <h1 style={{ margin: "0 0 8px", fontSize: 22, color: "#1a1a2e" }}>
-          CEPAC Dashboard Executivo
-        </h1>
-        <p style={{ margin: "0 0 32px", fontSize: 14, color: "#666" }}>
-          SP Urbanismo / Prodam — OUCAE
-        </p>
-
+        {/* Cabeçalho com gradiente */}
         <div
           style={{
-            background: "#fff8e1",
-            border: "1px solid #ffe082",
-            borderRadius: 6,
-            padding: "12px 16px",
-            marginBottom: 28,
-            fontSize: 13,
-            color: "#795548",
+            background: "linear-gradient(90deg, #0B2A4A 0%, #0F3A6D 55%, #145DA0 85%, #1C6ED5 100%)",
+            padding: "28px 32px 24px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
           }}
         >
-          Acesso restrito a usuários autorizados da SP Urbanismo.
+          <img
+            src="/imagens/logobranco.svg"
+            alt="ZENITE"
+            style={{ height: 72, width: "auto" }}
+          />
+          <div
+            style={{
+              width: "100%",
+              height: 1,
+              background: "rgba(255,255,255,0.2)",
+            }}
+          />
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: "rgba(255,255,255,0.8)",
+              textAlign: "center",
+              letterSpacing: "0.03em",
+            }}
+          >
+            Dashboard Executivo · OUCAE
+          </p>
         </div>
 
-        <button
-          onClick={handleLogin}
+        {/* Corpo do card */}
+        <div
           style={{
-            width: "100%",
-            padding: "12px 0",
-            background: "#1a73e8",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            fontSize: 15,
-            fontWeight: 700,
-            cursor: "pointer",
-            letterSpacing: ".3px",
+            background: "#fff",
+            padding: "36px 32px 40px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 16,
           }}
         >
-          Entrar com conta Microsoft
-        </button>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 15,
+              color: "#333",
+              textAlign: "center",
+              lineHeight: 1.5,
+            }}
+          >
+            Acesso restrito a usuários autorizados da SP Urbanismo.
+          </p>
+
+          <button
+            onClick={handleLogin}
+            style={{
+              marginTop: 8,
+              width: "100%",
+              padding: "13px 0",
+              background: "linear-gradient(90deg, #0B2A4A 0%, #145DA0 100%)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: "pointer",
+              letterSpacing: ".3px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.9"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+          >
+            <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
+              <path d="M10 0H0V10H10V0Z" fill="#F35325"/>
+              <path d="M21 0H11V10H21V0Z" fill="#81BC06"/>
+              <path d="M10 11H0V21H10V11Z" fill="#05A6F0"/>
+              <path d="M21 11H11V21H21V11Z" fill="#FFBA08"/>
+            </svg>
+            Entrar com conta Microsoft
+          </button>
+
+          <p style={{ margin: 0, fontSize: 11, color: "#aaa", textAlign: "center" }}>
+            SP Urbanismo · Prodam · OUCAE
+          </p>
+        </div>
       </div>
     </div>
   );

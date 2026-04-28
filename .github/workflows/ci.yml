@@ -270,7 +270,9 @@ jobs:
           build-args: |
             VITE_API_URL=${{ secrets.VITE_API_URL }}
             VITE_AZURE_CLIENT_ID=${{ secrets.PORTAL_AZURE_CLIENT_ID }}
+            VITE_AZURE_API_CLIENT_ID=${{ secrets.AZURE_AD_API_CLIENT_ID }}
             VITE_AZURE_TENANT_ID=${{ secrets.AZURE_AD_TENANT_ID }}
+            VITE_DEV_BYPASS_AUTH=${{ secrets.VITE_DEV_BYPASS_AUTH }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -316,6 +318,8 @@ jobs:
           build-args: |
             VITE_API_URL=${{ secrets.VITE_API_URL }}
             VITE_AZURE_CLIENT_ID=${{ secrets.DASHBOARD_AZURE_CLIENT_ID }}
+            VITE_AZURE_API_CLIENT_ID=${{ secrets.AZURE_AD_API_CLIENT_ID }}
             VITE_AZURE_TENANT_ID=${{ secrets.AZURE_AD_TENANT_ID }}
+            VITE_DEV_BYPASS_AUTH=${{ secrets.VITE_DEV_BYPASS_AUTH }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

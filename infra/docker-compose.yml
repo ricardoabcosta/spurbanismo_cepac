@@ -38,16 +38,18 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.portal
+      args:
+        VITE_API_BASE_URL: http://localhost:8001
+        VITE_AZURE_CLIENT_ID: "39d6d992-23d8-4abf-b9a0-9b0f89bfe8bf"
+        VITE_AZURE_API_CLIENT_ID: "e7525560-a7ae-4688-8ea9-6f1f923ef8c3"
+        VITE_AZURE_TENANT_ID: "f398df9c-fd0c-4829-a003-c770a1c4a063"
+        VITE_REDIRECT_URI: "http://localhost:3000/"
+        VITE_DEV_BYPASS_AUTH: "true"
     container_name: cepac_portal
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
-    environment:
-      VITE_API_URL: http://localhost:8001
-      VITE_AZURE_CLIENT_ID: ""
-      VITE_AZURE_TENANT_ID: f398df9c-fd0c-4829-a003-c770a1c4a063
-      VITE_DEV_BYPASS_AUTH: "true"
     ports:
       - "3000:3000"
 
@@ -58,15 +60,17 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.dashboard
+      args:
+        VITE_API_BASE_URL: http://localhost:8001
+        VITE_AZURE_CLIENT_ID: "39d6d992-23d8-4abf-b9a0-9b0f89bfe8bf"
+        VITE_AZURE_API_CLIENT_ID: "e7525560-a7ae-4688-8ea9-6f1f923ef8c3"
+        VITE_AZURE_TENANT_ID: "f398df9c-fd0c-4829-a003-c770a1c4a063"
+        VITE_REDIRECT_URI: "http://localhost:3001/"
+        VITE_DEV_BYPASS_AUTH: "true"
     container_name: cepac_dashboard
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
-    environment:
-      VITE_API_URL: http://localhost:8001
-      VITE_AZURE_CLIENT_ID: ""
-      VITE_AZURE_TENANT_ID: f398df9c-fd0c-4829-a003-c770a1c4a063
-      VITE_DEV_BYPASS_AUTH: "true"
     ports:
       - "3001:3001"

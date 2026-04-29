@@ -121,7 +121,7 @@ jobs:
           TESTCONTAINERS_RYUK_DISABLED: "true"
 
   # ---------------------------------------------------------------------------
-  # Job 5 — Build Portal (TypeScript + Vite)
+  # Job 5 — Build Portal (TypeScript + Vite) — gera dist/ e sobe como artifact
   # ---------------------------------------------------------------------------
   build-portal-frontend:
     name: Build Portal Frontend
@@ -149,12 +149,20 @@ jobs:
         working-directory: frontend/portal
         run: npm run build
         env:
-          VITE_API_URL: "https://placeholder.api"
-          VITE_AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
-          VITE_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_AZURE_CLIENT_ID: ${{ secrets.PORTAL_AZURE_CLIENT_ID }}
+          VITE_AZURE_API_CLIENT_ID: ${{ secrets.AZURE_AD_API_CLIENT_ID }}
+          VITE_AZURE_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-dist
+          path: frontend/portal/dist
+          retention-days: 1
 
   # ---------------------------------------------------------------------------
-  # Job 6 — Build Dashboard (TypeScript + Vite)
+  # Job 6 — Build Dashboard (TypeScript + Vite) — gera dist/ e sobe como artifact
   # ---------------------------------------------------------------------------
   build-dashboard-frontend:
     name: Build Dashboard Frontend
@@ -182,9 +190,17 @@ jobs:
         working-directory: frontend/dashboard
         run: npm run build
         env:
-          VITE_API_URL: "https://placeholder.api"
-          VITE_AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
-          VITE_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_AZURE_CLIENT_ID: ${{ secrets.DASHBOARD_AZURE_CLIENT_ID }}
+          VITE_AZURE_API_CLIENT_ID: ${{ secrets.AZURE_AD_API_CLIENT_ID }}
+          VITE_AZURE_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-dist
+          path: frontend/dashboard/dist
+          retention-days: 1
 
   # ---------------------------------------------------------------------------
   # Job 7 — Build imagem Docker da API
@@ -230,7 +246,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------------
-  # Job 8 — Build imagem Docker do Portal
+  # Job 8 — Build imagem Docker do Portal (usa dist/ pré-compilado do artifact)
   # ---------------------------------------------------------------------------
   build-portal:
     name: Build Portal Image
@@ -239,6 +255,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download portal dist
+        uses: actions/download-artifact@v4
+        with:
+          name: portal-dist
+          path: frontend/portal/dist
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -264,21 +286,15 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: infra/Dockerfile.portal
+          file: infra/Dockerfile.portal.prebuilt
           push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           tags: ${{ steps.meta-portal.outputs.tags }}
           labels: ${{ steps.meta-portal.outputs.labels }}
-          build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
-            VITE_AZURE_CLIENT_ID=${{ secrets.PORTAL_AZURE_CLIENT_ID }}
-            VITE_AZURE_API_CLIENT_ID=${{ secrets.AZURE_AD_API_CLIENT_ID }}
-            VITE_AZURE_TENANT_ID=${{ secrets.AZURE_AD_TENANT_ID }}
-            VITE_DEV_BYPASS_AUTH=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------------
-  # Job 9 — Build imagem Docker do Dashboard
+  # Job 9 — Build imagem Docker do Dashboard (usa dist/ pré-compilado do artifact)
   # ---------------------------------------------------------------------------
   build-dashboard:
     name: Build Dashboard Image
@@ -287,6 +303,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download dashboard dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboard-dist
+          path: frontend/dashboard/dist
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -312,15 +334,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: infra/Dockerfile.dashboard
+          file: infra/Dockerfile.dashboard.prebuilt
           push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           tags: ${{ steps.meta-dash.outputs.tags }}
           labels: ${{ steps.meta-dash.outputs.labels }}
-          build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
-            VITE_AZURE_CLIENT_ID=${{ secrets.DASHBOARD_AZURE_CLIENT_ID }}
-            VITE_AZURE_API_CLIENT_ID=${{ secrets.AZURE_AD_API_CLIENT_ID }}
-            VITE_AZURE_TENANT_ID=${{ secrets.AZURE_AD_TENANT_ID }}
-            VITE_DEV_BYPASS_AUTH=true
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -1,0 +1,33 @@
+# Node / frontend
+frontend/
+node_modules/
+
+# Tests
+tests/
+
+# Git / CI
+.git/
+.github/
+
+# Docs
+docs/
+
+# Dev environment
+.env
+.env.*
+!.env.example
+infra/.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# IDE
+.vscode/
+.idea/

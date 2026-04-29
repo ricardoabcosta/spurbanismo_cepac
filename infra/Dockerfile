@@ -54,5 +54,5 @@ USER cepac
 # Porta padrão da aplicação
 EXPOSE 8000
 
-# Uvicorn com 2 workers (Azure Container Apps escala via réplicas, não workers)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Processo único — Container Apps escala via réplicas, não via workers internos
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

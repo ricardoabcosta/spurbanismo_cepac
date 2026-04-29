@@ -27,7 +27,11 @@ export function useSnapshot(dataHistorica?: string): UseSnapshotResult {
     try {
       setError(null);
       const snapshot = await fetchSnapshot(dataHistorica);
-      setData(snapshot);
+      if (snapshot && Array.isArray(snapshot.setores)) {
+        setData(snapshot);
+      } else {
+        setError("Resposta inválida do servidor.");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao carregar snapshot.";
       setError(message);

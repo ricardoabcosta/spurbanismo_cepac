@@ -149,7 +149,7 @@ jobs:
         working-directory: frontend/portal
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_URL }}
           VITE_AZURE_CLIENT_ID: ${{ secrets.PORTAL_AZURE_CLIENT_ID }}
           VITE_AZURE_API_CLIENT_ID: ${{ secrets.AZURE_AD_API_CLIENT_ID }}
           VITE_AZURE_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
@@ -190,7 +190,7 @@ jobs:
         working-directory: frontend/dashboard
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_URL }}
           VITE_AZURE_CLIENT_ID: ${{ secrets.DASHBOARD_AZURE_CLIENT_ID }}
           VITE_AZURE_API_CLIENT_ID: ${{ secrets.AZURE_AD_API_CLIENT_ID }}
           VITE_AZURE_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}

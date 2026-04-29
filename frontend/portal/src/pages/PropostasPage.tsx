@@ -214,7 +214,7 @@ export default function PropostasPage() {
 
   useEffect(() => {
     listarSetores()
-      .then(setSetores)
+      .then((data) => { if (Array.isArray(data)) setSetores(data); })
       .catch(() => {/* silencioso — select fica vazio */});
   }, []);
 
@@ -248,9 +248,9 @@ export default function PropostasPage() {
     setErro("");
     try {
       const resp = await listarPropostasAE(f);
-      setItems(resp.items);
-      setTotal(resp.total);
-      setTotalPages(resp.total_pages);
+      setItems(Array.isArray(resp?.items) ? resp.items : []);
+      setTotal(resp?.total ?? 0);
+      setTotalPages(resp?.total_pages ?? 1);
     } catch {
       setErro("Falha ao carregar propostas. Tente novamente.");
     } finally {

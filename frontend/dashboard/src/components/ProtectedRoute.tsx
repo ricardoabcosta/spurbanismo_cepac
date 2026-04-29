@@ -9,7 +9,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+const DEV_BYPASS = true;
 
 const ProtectedRoute: React.FC<Props> = ({ children }) => {
   const { inProgress } = useMsal();

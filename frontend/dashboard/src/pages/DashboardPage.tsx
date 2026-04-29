@@ -18,7 +18,7 @@ import GraficosAnaliticos from "../components/GraficosAnaliticos";
  * Extrai o papel do usuário a partir das claims do token MSAL.
  * A claim "roles" vem do App Role definido no Azure AD.
  */
-const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+const DEV_BYPASS = true;
 
 function useUserRole(): { isDiretor: boolean; nome: string } {
   const { accounts } = useMsal();

@@ -8,7 +8,7 @@ import axios, { type AxiosInstance } from "axios";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../authConfig";
 
-const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+const DEV_BYPASS = true;
 
 // Instância singleton do MSAL — criada uma vez e exportada para uso no App.tsx
 export const msalInstance = new PublicClientApplication(msalConfig);

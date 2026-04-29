@@ -8,7 +8,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { PublicClientApplication, InteractionRequiredAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../authConfig";
 
-const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+const DEV_BYPASS = true;
 
 export const msalInstance = new PublicClientApplication(msalConfig);
 

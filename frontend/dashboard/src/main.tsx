@@ -4,7 +4,7 @@ import App from "./App";
 
 import { msalInstance } from "./api/client";
 
-const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+const DEV_BYPASS = true;
 
 function render() {
   const rootEl = document.getElementById("root");

@@ -1,7 +1,7 @@
 # Pendências Fase 2 — CEPAC SP Urbanismo
 
 > Documento de controle das atividades que restam para finalizar a Fase 2 em produção.
-> Atualizado em: 01/05/2026 (testes de integração corrigidos)
+> Atualizado em: 01/05/2026 (CI totalmente verde — testes + mypy + builds)
 
 ---
 
@@ -16,8 +16,8 @@
 | App Registration | ✅ PN1006-CEPAC-API + PN1006-CEPAC-Frontend | 01/05/2026 |
 | GitHub Secrets (completo) | ✅ ACR + VITE_API_URL + TENANT_ID + CLIENT_IDs | 01/05/2026 |
 | DEV_BYPASS desativado | ✅ Container App + código frontend | 01/05/2026 |
-| CI/CD — builds e deploy | ✅ Pipeline verde, imagens com auth real deployadas | 01/05/2026 |
-| Testes de integração | ✅ Todos os testes passando (commit 4db34d1) | 01/05/2026 |
+| CI/CD — builds e deploy | ✅ Pipeline totalmente verde (commit 07167b5) | 01/05/2026 |
+| Testes de integração | ✅ 35/35 passando local e no CI (commit b32535b) | 01/05/2026 |
 | Primeiro login real | ⏳ Pendente | — |
 | Blob Storage funcional | ⏳ Pendente | — |
 
@@ -138,17 +138,30 @@ az containerapp logs show --name cepac-portal --resource-group rg_spurbanismo_ce
 
 ---
 
-## Bloco 3b — Testes de integração ✅ CONCLUÍDO
+## Bloco 3b — Testes de integração + CI ✅ CONCLUÍDO
 
-**Concluído em:** 01/05/2026 — commit `4db34d1`
+**Concluído em:** 01/05/2026 — commits `4db34d1` → `b32535b` → `07167b5`
 
-| Teste | Causa | Correção aplicada |
+### Correções nos testes (lógica)
+
+| Teste | Causa | Correção |
 |---|---|---|
-| `test_primeiro_login_cria_tecnico` | `datetime` aware em coluna `TIMESTAMP WITHOUT TIME ZONE` | `datetime.now(tz=timezone.utc).replace(tzinfo=None)` em `dependencies.py` |
-| `test_post_medicao_nova` | Seed `006` já ocupa 2026-10-01 | Payload alterado para 2027-03-01 |
-| `test_post_medicao_data_duplicada_retorna_422` | Efeito cascata do teste acima | Payload alterado para 2027-04-01 |
-| `test_criar_solicitacao_pendente` | Status inicial é `EM_ANALISE`, não `PENDENTE` (legado) | Asserção e docstring corrigidos em `test_portal.py` |
-| `test_cancelar_nao_pendente_retorna_422` | `exception_handler(422)` stringificava `exc.detail` dict | `app.py`: `detail = exc.detail if isinstance(exc.detail, dict) else str(exc)` |
+| `test_primeiro_login_cria_tecnico` | `datetime` aware em `TIMESTAMP WITHOUT TIME ZONE` | `.replace(tzinfo=None)` em `dependencies.py` |
+| `test_post_medicao_nova` | Seed `006` ocupa `2026-10-01` | Payload movido para `2027-03-01` |
+| `test_post_medicao_data_duplicada_retorna_422` | Efeito cascata | Payload movido para `2027-04-01` |
+| `test_criar_solicitacao_pendente` | Status inicial é `EM_ANALISE`, não `PENDENTE` | Asserção corrigida em `test_portal.py` |
+| `test_cancelar_nao_pendente_retorna_422` | `exception_handler(422)` stringificava `exc.detail` dict | `isinstance(exc, HTTPException)` antes de acessar `.detail` |
+
+### Correções na infraestrutura de testes (conftest)
+
+| Problema | Causa | Correção |
+|---|---|---|
+| `ValidationError: Extra inputs not permitted` | `DEEPSEEK_API_KEY` no ambiente local | `extra = "ignore"` no `Settings` (`config.py`) |
+| `DEV_BYPASS_AUTH=true` no `.env` local | Todos os requests autenticados pelo bypass, 401 nunca disparado | `os.environ["DEV_BYPASS_AUTH"] = "false"` antes dos imports no conftest |
+| `docker.errors.NotFound` no Ryuk | Docker rootless — container Ryuk inicializa e desaparece | `os.environ["TESTCONTAINERS_RYUK_DISABLED"] = "true"` no conftest |
+| `RuntimeError: no current event loop` (Python 3.12+) | `asyncio.run()` no `pg_container` fechava o loop; `get_event_loop()` não cria loop implícito | `asyncio.set_event_loop(loop)` no fixture + `pg_container` depende de `event_loop` |
+| `MEDICAO_JA_EXISTE` falso para `2027-03-01` | FK `operador_id → usuario.id` violada — UUID sintético do `DIRETOR_USER` não existia na tabela | `_seed_usuario()` insere o usuário sintético dentro da transação do teste |
+| `mypy: Exception has no attribute detail` | Handler assinava `exc: Exception` mas acessava `.detail` diretamente | `isinstance(exc, HTTPException)` explícito antes de acessar `.detail` |
 
 ---
 

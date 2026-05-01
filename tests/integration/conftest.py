@@ -3,18 +3,21 @@ Fixtures compartilhadas para testes de integração CEPAC Fase 2.
 
 Estratégia:
   - PostgreSQL 15 real via testcontainers (session scope).
-  - Migrations 001–006 aplicadas uma única vez com asyncpg.
+  - Migrations 001–014 aplicadas uma única vez com asyncpg.
   - Cada teste roda dentro de uma transação revertida no teardown
     (join_transaction_mode="create_savepoint" → commit() vira SAVEPOINT release).
   - get_db e get_current_user são sobrescritos no app via dependency_overrides.
   - Lifespan (job TTL) não é disparado: ASGITransport não chama lifespan.
+  - event_loop session-scoped garante que o pool asyncpg do async_engine
+    não seja invalidado entre testes (asyncpg amarra o pool ao 1º event loop).
 
 Ordem das migrations (004a DEVE preceder 004):
-  001 → 002 → 003 → 004a → 004 → 005 → 006
+  001 → 002 → 003 → 004a → 004 → 005 → ... → 014
 """
 from __future__ import annotations
 
 import asyncio
+from asyncio import AbstractEventLoop
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import AsyncGenerator
@@ -72,6 +75,33 @@ def _make_user(papel: PapelUsuarioEnum, upn: str | None = None) -> UsuarioAutent
 
 TECNICO_USER = _make_user(PapelUsuarioEnum.TECNICO)
 DIRETOR_USER = _make_user(PapelUsuarioEnum.DIRETOR)
+
+
+# ---------------------------------------------------------------------------
+# Event loop único para toda a sessão de testes
+#
+# Por que é necessário:
+#   asyncpg amarra o pool de conexões ao event loop do momento da criação.
+#   pytest-asyncio fecha o loop após cada teste por padrão. Ao chegar no
+#   segundo teste, o pool do async_engine (session-scoped) está preso a um
+#   loop já fechado → RuntimeError.
+#   A solução é um único loop para toda a sessão, compartilhado por todos
+#   os fixtures e testes async.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def event_loop() -> AbstractEventLoop:
+    """
+    Event loop único para toda a sessão de testes de integração.
+
+    Necessário porque o async_engine (session-scoped) e o pool asyncpg
+    ficam amarrados ao loop criado no primeiro fixture async. Sem este
+    fixture, o pytest-asyncio fecha o loop após cada teste e o pool
+    fica inválido a partir do segundo teste.
+    """
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
 
 
 # ---------------------------------------------------------------------------

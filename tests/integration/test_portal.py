@@ -35,7 +35,7 @@ async def _pegar_titulo_disponivel(db: AsyncSession) -> TituloCepac:
         .options(selectinload(TituloCepac.setor))
         .where(TituloCepac.estado == EstadoTituloEnum.DISPONIVEL)
         .where(TituloCepac.setor_id.in_(
-            select(Setor.id).where(Setor.bloqueio_nr == False)
+            select(Setor.id).where(Setor.bloqueio_nr.is_(False))
         ))
         .limit(1)
     )

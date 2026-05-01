@@ -228,10 +228,15 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
         )
 
     # Respostas 422 já formatadas pelas rotas (ErroNegocioOut) — preserva dict
-    detail = exc.detail if isinstance(exc.detail, dict) else str(exc)
+    from fastapi import HTTPException as _HTTPException
+    if isinstance(exc, _HTTPException) and isinstance(exc.detail, dict):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": exc.detail},
+        )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": detail},
+        content={"detail": str(exc)},
     )
 
 

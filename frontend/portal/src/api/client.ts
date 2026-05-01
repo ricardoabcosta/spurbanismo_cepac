@@ -37,11 +37,11 @@ function buildAxiosInstance(): AxiosInstance {
         account: accounts[0],
       });
       config.headers["Authorization"] = `Bearer ${result.accessToken}`;
+      return config;
     } catch {
       await msalInstance.loginRedirect(loginRequest);
+      return new Promise(() => undefined);
     }
-
-    return config;
   });
 
   // Interceptor de RESPONSE — trata 401

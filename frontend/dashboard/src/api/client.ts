@@ -32,14 +32,13 @@ if (!DEV_BYPASS) {
         account: accounts[0],
       });
       config.headers.Authorization = `Bearer ${tokenResponse.accessToken}`;
+      return config;
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
         await msalInstance.loginRedirect(loginRequest);
       }
-      throw error;
+      return new Promise(() => undefined);
     }
-
-    return config;
   });
 
   apiClient.interceptors.response.use(

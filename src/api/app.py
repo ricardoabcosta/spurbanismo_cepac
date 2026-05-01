@@ -35,7 +35,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 
-from src.api.routes import admin, certidoes, dashboard, documentos, medicoes, movimentacoes, portal, saldo, solicitacoes, titulos
+from src.api.routes import admin, certidoes, dashboard, documentos, medicoes, movimentacoes, portal, saldo, solicitacoes, titulos  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

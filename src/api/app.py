@@ -28,6 +28,16 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
+# Configuração de logging baseada em settings.log_level                        #
+# --------------------------------------------------------------------------- #
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+
+# --------------------------------------------------------------------------- #
 # Sessão de banco para uso no job (fora do ciclo de request/response)          #
 # --------------------------------------------------------------------------- #
 

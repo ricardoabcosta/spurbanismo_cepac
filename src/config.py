@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # NUNCA definir em produção.
     dev_bypass_auth: bool = False
 
+    # --- Logging ---
+    # Nível de log: DEBUG, INFO, WARNING, ERROR (default: INFO)
+    log_level: str = "INFO"
+
     # --- Azure Blob Storage (T13) ---
     azure_blob_account_name: Optional[str] = None
     azure_blob_account_key: Optional[str] = None

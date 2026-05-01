@@ -22,13 +22,11 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.routes import admin, certidoes, dashboard, documentos, medicoes, movimentacoes, portal, saldo, solicitacoes, titulos
 from src.config import settings
-
-logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
 # Configuração de logging baseada em settings.log_level                        #
+# IMPORTANTE: Deve vir ANTES de qualquer import que crie loggers (routers etc.)
 # --------------------------------------------------------------------------- #
 
 logging.basicConfig(
@@ -36,6 +34,10 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
+
+from src.api.routes import admin, certidoes, dashboard, documentos, medicoes, movimentacoes, portal, saldo, solicitacoes, titulos
+
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
 # Sessão de banco para uso no job (fora do ciclo de request/response)          #

@@ -61,7 +61,7 @@ def _make_payload(titulo: TituloCepac, numero_sei: str, **overrides) -> dict:
 async def test_criar_solicitacao_pendente(
     client_tecnico: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """POST cria solicitação PENDENTE; título transiciona para EM_ANALISE."""
+    """POST cria solicitação EM_ANALISE; títulos também transitam para EM_ANALISE."""
     titulo = await _pegar_titulo_disponivel(db_session)
 
     response = await client_tecnico.post(
@@ -71,7 +71,7 @@ async def test_criar_solicitacao_pendente(
     assert response.status_code == 201, response.text
 
     data = response.json()
-    assert data["status"] == "PENDENTE"
+    assert data["status"] == "EM_ANALISE"
     assert data["setor"] == titulo.setor.nome
     assert data["uso"] == titulo.uso.value
 

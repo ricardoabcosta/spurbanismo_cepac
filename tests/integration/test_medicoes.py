@@ -31,7 +31,7 @@ async def test_get_medicao_atual_tecnico(client_tecnico: AsyncClient) -> None:
 async def test_post_medicao_nova(client_diretor: AsyncClient) -> None:
     """POST /medicoes cria nova medição; valor_acumulado = anterior + novo."""
     payload = {
-        "data_referencia": "2026-10-01",
+        "data_referencia": "2027-03-01",
         "valor_medicao": "500000.00",
         "numero_processo_sei": "7810.2026/0001000-0",
         "descricao": "Medição de teste",
@@ -40,7 +40,7 @@ async def test_post_medicao_nova(client_diretor: AsyncClient) -> None:
     assert response.status_code == 201, response.text
 
     data = response.json()
-    assert data["data_referencia"] == "2026-10-01"
+    assert data["data_referencia"] == "2027-03-01"
 
     # Valor acumulado = seed (3987822642.21) + novo (500000.00)
     acumulado = float(data["valor_acumulado"])
@@ -53,7 +53,7 @@ async def test_post_medicao_data_duplicada_retorna_422(
 ) -> None:
     """POST com data_referencia já existente retorna 422 MEDICAO_JA_EXISTE."""
     payload = {
-        "data_referencia": "2026-11-01",
+        "data_referencia": "2027-04-01",
         "valor_medicao": "100000.00",
         "numero_processo_sei": "7810.2026/0001001-7",
     }

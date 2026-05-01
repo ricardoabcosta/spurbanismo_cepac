@@ -227,10 +227,11 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
             content={"detail": exc.errors()},
         )
 
-    # Respostas 422 já formatadas pelas rotas (ErroNegocioOut)
+    # Respostas 422 já formatadas pelas rotas (ErroNegocioOut) — preserva dict
+    detail = exc.detail if isinstance(exc.detail, dict) else str(exc)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": str(exc)},
+        content={"detail": detail},
     )
 
 

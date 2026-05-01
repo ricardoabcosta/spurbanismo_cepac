@@ -16,6 +16,16 @@ Ordem das migrations (004a DEVE preceder 004):
 """
 from __future__ import annotations
 
+# ---------------------------------------------------------------------------
+# Variáveis de ambiente para testes — definidas ANTES dos imports que
+# carregam src.config.settings (pydantic-settings lê os.environ na
+# inicialização; o .env local pode ter DEV_BYPASS_AUTH=true e Ryuk pode
+# falhar em ambientes Docker rootless).
+# ---------------------------------------------------------------------------
+import os
+os.environ["DEV_BYPASS_AUTH"] = "false"
+os.environ["TESTCONTAINERS_RYUK_DISABLED"] = "true"
+
 import asyncio
 from asyncio import AbstractEventLoop
 from datetime import datetime, timezone, timedelta
@@ -33,6 +43,7 @@ from src.api.app import app
 from src.api.auth.dependencies import UsuarioAutenticado, get_current_user
 from src.api.dependencies import get_db
 from src.core.models.enums import PapelUsuarioEnum
+from src.core.models.usuario import Usuario as UsuarioModel
 
 # ---------------------------------------------------------------------------
 # Ordem explícita de migrations (004a precede 004 — ver comentário no arquivo)
@@ -80,28 +91,23 @@ DIRETOR_USER = _make_user(PapelUsuarioEnum.DIRETOR)
 # ---------------------------------------------------------------------------
 # Event loop único para toda a sessão de testes
 #
-# Por que é necessário:
-#   asyncpg amarra o pool de conexões ao event loop do momento da criação.
-#   pytest-asyncio fecha o loop após cada teste por padrão. Ao chegar no
-#   segundo teste, o pool do async_engine (session-scoped) está preso a um
-#   loop já fechado → RuntimeError.
-#   A solução é um único loop para toda a sessão, compartilhado por todos
-#   os fixtures e testes async.
+# asyncpg amarra o pool de conexões ao event loop do momento da criação.
+# pytest-asyncio 0.23 fecha o loop após cada teste por padrão; sem este
+# fixture o pool do async_engine (session-scoped) fica preso a um loop
+# já fechado a partir do segundo teste.
+#
+# asyncio.set_event_loop(loop) é necessário no Python 3.12+ porque
+# asyncio.get_event_loop() lança RuntimeError quando não há loop corrente.
+# pytest-asyncio 0.23 chama get_event_loop() internamente.
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
 def event_loop() -> AbstractEventLoop:
-    """
-    Event loop único para toda a sessão de testes de integração.
-
-    Necessário porque o async_engine (session-scoped) e o pool asyncpg
-    ficam amarrados ao loop criado no primeiro fixture async. Sem este
-    fixture, o pytest-asyncio fecha o loop após cada teste e o pool
-    fica inválido a partir do segundo teste.
-    """
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
     loop.close()
+    asyncio.set_event_loop(None)
 
 
 # ---------------------------------------------------------------------------
@@ -126,13 +132,16 @@ async def _apply_migrations(pg: PostgresContainer) -> None:
 
 
 @pytest.fixture(scope="session")
-def pg_container():
+def pg_container(event_loop: AbstractEventLoop):
     """
     Inicia o container PostgreSQL 15 e aplica todas as migrations.
     Compartilhado por toda a sessão de testes — teardown automático ao final.
+
+    Depende explicitamente de event_loop para garantir que o loop de sessão
+    esteja definido antes de qualquer chamada asyncio (Python 3.12+).
     """
     with PostgresContainer("postgres:15-alpine") as pg:
-        asyncio.run(_apply_migrations(pg))
+        event_loop.run_until_complete(_apply_migrations(pg))
         yield pg
 
 
@@ -175,32 +184,38 @@ async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 # ---------------------------------------------------------------------------
-# Clientes HTTP com identidades distintas
+# Helpers de clientes HTTP
 # ---------------------------------------------------------------------------
 
-def _make_client_fixture(user: UsuarioAutenticado):
-    """Factory que gera fixtures de cliente autenticado."""
+async def _seed_usuario(session: AsyncSession, user: UsuarioAutenticado) -> None:
+    """
+    Insere o usuário sintético na tabela `usuario` dentro da transação do teste.
 
-    async def _fixture(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-        async def _override_db():
-            yield db_session
-
-        app.dependency_overrides[get_db] = _override_db
-        app.dependency_overrides[get_current_user] = lambda: user
-
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
-            yield ac
-
-        app.dependency_overrides.clear()
-
-    return _fixture
+    Necessário para que colunas FK como `medicao_obra.operador_id` e
+    `solicitacao_vinculacao.tecnico_id` passem na verificação de integridade
+    referencial do PostgreSQL (a linha existe na mesma transação, mas não é
+    committed — o rollback no teardown do db_session desfaz tudo).
+    """
+    from sqlalchemy import select as sa_select
+    exists = await session.execute(
+        sa_select(UsuarioModel).where(UsuarioModel.id == user.id)
+    )
+    if exists.scalar_one_or_none() is None:
+        session.add(UsuarioModel(
+            id=user.id,
+            upn=user.upn,
+            nome=user.nome,
+            papel=user.papel,
+            ativo=True,
+        ))
+        await session.flush()
 
 
 @pytest.fixture
 async def client_tecnico(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Cliente HTTP autenticado como TECNICO."""
+    await _seed_usuario(db_session, TECNICO_USER)
+
     async def _override_db():
         yield db_session
 
@@ -218,6 +233,8 @@ async def client_tecnico(db_session: AsyncSession) -> AsyncGenerator[AsyncClient
 @pytest.fixture
 async def client_diretor(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Cliente HTTP autenticado como DIRETOR."""
+    await _seed_usuario(db_session, DIRETOR_USER)
+
     async def _override_db():
         yield db_session
 

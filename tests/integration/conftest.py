@@ -46,6 +46,13 @@ MIGRATION_ORDER = [
     "005_portal_campos.sql",
     "006_seed_medicao_inicial.sql",
     "007_seed_parametros_sistema.sql",
+    "008_setor_admin_fields.sql",
+    "009_setor_teto_r.sql",
+    "010_configuracao_operacao.sql",
+    "011_cepac_parametros.sql",
+    "012_proposta_campos_planilha.sql",
+    "013_certidao_expand.sql",
+    "014_limpa_certidoes_formato_invalido.sql",
 ]
 
 

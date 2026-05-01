@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-const DEV_BYPASS = true;
+const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const isAuthenticated = useIsAuthenticated();

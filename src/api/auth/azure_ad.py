@@ -116,7 +116,7 @@ async def validate_token(token: str, tenant_id: str, client_id: str) -> TokenPay
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=client_id,
+            audience=[client_id, f"api://{client_id}"],
             issuer=issuer,
             options={"verify_exp": True},
         )

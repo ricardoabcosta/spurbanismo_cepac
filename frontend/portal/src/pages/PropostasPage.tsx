@@ -197,7 +197,7 @@ export default function PropostasPage() {
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
 
-  const DEV_BYPASS = true;
+  const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
   const { instance, accounts } = useMsal();
   const nomeUsuario = DEV_BYPASS ? "Administrador" : (accounts[0]?.name ?? "Usuário");
   const iniciais = nomeUsuario

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { loginRequest } from "../authConfig";
 
-const DEV_BYPASS = true;
+const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
 export default function LoginPage() {
   const { instance } = useMsal();

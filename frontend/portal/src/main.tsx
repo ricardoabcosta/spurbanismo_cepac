@@ -16,11 +16,18 @@ function render() {
   );
 }
 
+async function bootstrap() {
+  await msalInstance.initialize();
+  await msalInstance.handleRedirectPromise();
+  render();
+}
+
 if (DEV_BYPASS) {
   render();
 } else {
-  msalInstance.initialize().then(() => {
-    msalInstance.handleRedirectPromise().catch(console.error);
+  bootstrap().catch((err) => {
+    console.error("Falha na inicialização MSAL:", err);
+    // Renderiza mesmo com erro para mostrar a tela de login
     render();
   });
 }

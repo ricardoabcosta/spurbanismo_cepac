@@ -11,11 +11,8 @@ import { msalConfig, loginRequest } from "../authConfig";
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
 // Instância singleton do MSAL — criada uma vez e exportada para uso no App.tsx
+// NOTA: initialize() NÃO é chamado aqui — é responsabilidade do main.tsx
 export const msalInstance = new PublicClientApplication(msalConfig);
-
-if (!DEV_BYPASS) {
-  await msalInstance.initialize();
-}
 
 function buildAxiosInstance(): AxiosInstance {
   const instance = axios.create({

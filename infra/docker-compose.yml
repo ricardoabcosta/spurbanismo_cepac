@@ -18,15 +18,15 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://cepacadmin:pr0d%40M2026@cepac-pgdb.postgres.database.azure.com:5432/cepac?ssl=require
       AZURE_AD_TENANT_ID: f398df9c-fd0c-4829-a003-c770a1c4a063
-      AZURE_AD_CLIENT_ID: ""
-      DEV_BYPASS_AUTH: "true"
+      AZURE_AD_CLIENT_ID: "e7525560-a7ae-4688-8ea9-6f1f923ef8c3"
+      DEV_BYPASS_AUTH: "false"
       AZURE_BLOB_ACCOUNT_NAME: cepacstorageacct
       AZURE_BLOB_ACCOUNT_KEY: ""
       AZURE_BLOB_CONTAINER_NAME: cepac-documentos
     ports:
       - "8001:8000"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\"" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,7 +44,7 @@ services:
         VITE_AZURE_API_CLIENT_ID: "e7525560-a7ae-4688-8ea9-6f1f923ef8c3"
         VITE_AZURE_TENANT_ID: "f398df9c-fd0c-4829-a003-c770a1c4a063"
         VITE_REDIRECT_URI: "http://localhost:3000/"
-        VITE_DEV_BYPASS_AUTH: "true"
+        VITE_DEV_BYPASS_AUTH: "false"
     container_name: cepac_portal
     restart: unless-stopped
     depends_on:
@@ -66,7 +66,7 @@ services:
         VITE_AZURE_API_CLIENT_ID: "e7525560-a7ae-4688-8ea9-6f1f923ef8c3"
         VITE_AZURE_TENANT_ID: "f398df9c-fd0c-4829-a003-c770a1c4a063"
         VITE_REDIRECT_URI: "http://localhost:3001/"
-        VITE_DEV_BYPASS_AUTH: "true"
+        VITE_DEV_BYPASS_AUTH: "false"
     container_name: cepac_dashboard
     restart: unless-stopped
     depends_on:

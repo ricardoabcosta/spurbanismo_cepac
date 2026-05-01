@@ -2,6 +2,24 @@
 frontend/
 !frontend/portal/dist/
 !frontend/dashboard/dist/
+!frontend/portal/package.json
+!frontend/portal/package-lock.json
+!frontend/dashboard/package.json
+!frontend/dashboard/package-lock.json
+!frontend/portal/src/
+!frontend/dashboard/src/
+!frontend/portal/public/
+!frontend/dashboard/public/
+!frontend/portal/tsconfig.json
+!frontend/dashboard/tsconfig.json
+!frontend/portal/tsconfig.node.json
+!frontend/dashboard/tsconfig.node.json
+!frontend/portal/vite.config.ts
+!frontend/dashboard/vite.config.ts
+!frontend/portal/index.html
+!frontend/dashboard/index.html
+!frontend/portal/.env.production
+!frontend/dashboard/.env.production
 node_modules/
 
 # Tests

@@ -1,13 +1,31 @@
-import React from "react";
-import { useMsal } from "@azure/msal-react";
+import { useMsal, useIsAuthenticated } from "@azure/msal-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { loginRequest } from "../authConfig";
 
-const LoginPage: React.FC = () => {
-  const { instance } = useMsal();
+const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
-  const handleLogin = () => {
-    instance.loginRedirect(loginRequest).catch(console.error);
-  };
+export default function LoginPage() {
+  const { instance } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/dashboard";
+
+  useEffect(() => {
+    if (DEV_BYPASS || isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
+
+  async function handleLogin() {
+    try {
+      await instance.loginRedirect(loginRequest);
+    } catch (e) {
+      console.error("Erro ao iniciar login:", e);
+    }
+  }
 
   return (
     <div
@@ -61,7 +79,7 @@ const LoginPage: React.FC = () => {
               letterSpacing: "0.03em",
             }}
           >
-            Dashboard Executivo · OUCAE
+            Operação Urbana Consorciada Água Espraiada
           </p>
         </div>
 
@@ -111,10 +129,10 @@ const LoginPage: React.FC = () => {
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
           >
             <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
-              <path d="M10 0H0V10H10V0Z" fill="#F35325"/>
-              <path d="M21 0H11V10H21V0Z" fill="#81BC06"/>
-              <path d="M10 11H0V21H10V11Z" fill="#05A6F0"/>
-              <path d="M21 11H11V21H21V11Z" fill="#FFBA08"/>
+              <path d="M10 0H0V10H10V0Z" fill="#F35325" />
+              <path d="M21 0H11V10H21V0Z" fill="#81BC06" />
+              <path d="M10 11H0V21H10V11Z" fill="#05A6F0" />
+              <path d="M21 11H11V21H21V11Z" fill="#FFBA08" />
             </svg>
             Entrar com conta Microsoft
           </button>
@@ -126,6 +144,4 @@ const LoginPage: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default LoginPage;
+}

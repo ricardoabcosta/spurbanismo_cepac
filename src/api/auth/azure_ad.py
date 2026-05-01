@@ -109,7 +109,13 @@ async def validate_token(token: str, tenant_id: str, client_id: str) -> TokenPay
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    issuer = f"https://login.microsoftonline.com/{tenant_id}/v2.0"
+    # Aceita tanto issuer v2 (login.microsoftonline.com/{tid}/v2.0)
+    # quanto v1 (sts.windows.net/{tid}/ ou login.microsoftonline.com/{tid}/)
+    issuers = [
+        f"https://login.microsoftonline.com/{tenant_id}/v2.0",
+        f"https://login.microsoftonline.com/{tenant_id}/",
+        f"https://sts.windows.net/{tenant_id}/",
+    ]
 
     try:
         payload = jwt.decode(
@@ -117,7 +123,7 @@ async def validate_token(token: str, tenant_id: str, client_id: str) -> TokenPay
             signing_key.key,
             algorithms=["RS256"],
             audience=[client_id, f"api://{client_id}"],
-            issuer=issuer,
+            issuer=issuers,
             options={"verify_exp": True},
         )
     except ExpiredSignatureError:

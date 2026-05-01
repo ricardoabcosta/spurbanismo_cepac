@@ -1,210 +1,180 @@
 # Pendências Fase 2 — CEPAC SP Urbanismo
 
 > Documento de controle das atividades que restam para finalizar a Fase 2 em produção.
-> Atualizado em: 17/04/2026
+> Atualizado em: 01/05/2026 (testes de integração corrigidos)
 
 ---
 
 ## Status geral
 
-| Bloco | Estado |
-|---|---|
-| Código (Fase 1 + Fase 2) | ✅ Concluído |
-| Infraestrutura Azure | ✅ Provisionada |
-| Banco de dados populado | ✅ 237 títulos, 197 propostas |
-| CORS configurado | ✅ URLs reais |
-| GitHub Secrets (parcial) | ✅ ACR + VITE_API_URL + TENANT_ID |
-| App Registration | ⏳ Aguardando Infra |
-| Primeiro deploy CI/CD | ⏳ Bloqueado pelo App Registration |
-| Blob Storage funcional | ⏳ Bloqueado pelo primeiro deploy |
+| Bloco | Estado | Atualizado em |
+|---|---|---|
+| Código (Fase 1 + Fase 2) | ✅ Concluído | 16/04/2026 |
+| Infraestrutura Azure | ✅ Provisionada | 17/04/2026 |
+| Banco de dados populado | ✅ 237 títulos, 197 propostas | 17/04/2026 |
+| CORS configurado | ✅ URLs reais | 17/04/2026 |
+| App Registration | ✅ PN1006-CEPAC-API + PN1006-CEPAC-Frontend | 01/05/2026 |
+| GitHub Secrets (completo) | ✅ ACR + VITE_API_URL + TENANT_ID + CLIENT_IDs | 01/05/2026 |
+| DEV_BYPASS desativado | ✅ Container App + código frontend | 01/05/2026 |
+| CI/CD — builds e deploy | ✅ Pipeline verde, imagens com auth real deployadas | 01/05/2026 |
+| Testes de integração | ✅ Todos os testes passando (commit 4db34d1) | 01/05/2026 |
+| Primeiro login real | ⏳ Pendente | — |
+| Blob Storage funcional | ⏳ Pendente | — |
 
 ---
 
-## Bloco 1 — App Registration (pré-requisito de tudo)
+## Bloco 1 — App Registration ✅ CONCLUÍDO
 
-**Responsável:** Infra / Prodam  
-**Bloqueio:** todos os itens abaixo dependem deste
+**Concluído em:** 01/05/2026
+**Responsável:** Infra / Prodam
 
-### O que solicitar
-
-Criar **2 registros** no Azure AD (Entra ID) do tenant `f398df9c-fd0c-4829-a003-c770a1c4a063`:
-
-#### Registro 1 — CEPAC-API (backend)
+### Registro 1 — PN1006-CEPAC-API (backend)
 
 | Campo | Valor |
 |---|---|
-| Nome | `CEPAC-API` |
-| Tipo de conta | Contas somente neste diretório |
-| URI de redirecionamento | (nenhum — API sem UI) |
-| Expose an API → Application ID URI | `api://<CLIENT_ID_GERADO>` |
-| Scope a criar | `CEPAC.Access` (consentimento: Admins and users) |
+| Client ID | `e7525560-a7ae-4688-8ea9-6f1f923ef8c3` |
+| Tenant ID | `f398df9c-fd0c-4829-a003-c770a1c4a063` |
+| Application ID URI | `api://e7525560-a7ae-4688-8ea9-6f1f923ef8c3` |
+| Scope exposto | `CEPAC.Acesso` (consentimento: Admins and users) |
+| Client Secret | Gerado (não necessário para validação JWT — ver nota abaixo) |
 
-#### Registro 2 — CEPAC-Frontend (portal + dashboard)
+### Registro 2 — PN1006-CEPAC-Frontend (portal + dashboard)
 
 | Campo | Valor |
 |---|---|
-| Nome | `CEPAC-Frontend` |
-| Tipo de conta | Contas somente neste diretório |
-| URI de redirecionamento (SPA) | `https://cepac-portal.redpond-877494a8.eastus.azurecontainerapps.io` |
-| URI de redirecionamento (SPA) | `https://cepac-dashboard.redpond-877494a8.eastus.azurecontainerapps.io` |
-| URI de redirecionamento (dev) | `http://localhost:3000` |
-| URI de redirecionamento (dev) | `http://localhost:3001` |
-| API Permissions | `CEPAC-API / CEPAC.Access` (delegated) |
+| Client ID | `39d6d992-23d8-4abf-b9a0-9b0f89bfe8bf` |
+| Tenant ID | `f398df9c-fd0c-4829-a003-c770a1c4a063` |
+| URIs de redirecionamento (SPA) | `https://cepac-portal.redpond-877494a8.eastus.azurecontainerapps.io/` |
+| | `https://cepac-dashboard.redpond-877494a8.eastus.azurecontainerapps.io/` |
+| | `http://localhost:3000/`, `http://localhost:5173/` |
+| | `http://localhost:3001/`, `http://localhost:5174/` |
+| API Permissions | `CEPAC-API / CEPAC.Acesso` (delegated) ✅ |
 
-> **Retorno esperado:** `CLIENT_ID` do Registro 1 e `CLIENT_ID` do Registro 2.
+> **Nota sobre o Client Secret:** a API valida JWTs via JWKS (chaves públicas do Azure AD) — não precisa
+> do client secret para isso. O secret **não deve ser configurado** no Container App. Caso necessário para
+> outras integrações futuras, regenerar antes de usar (o original foi exposto em texto no canal de comunicação).
 
 ---
 
-## Bloco 2 — Configuração pós-App Registration
+## Bloco 2 — Configuração pós-App Registration ✅ CONCLUÍDO
 
-Executar **em ordem** assim que os CLIENT_IDs chegarem.
+**Concluído em:** 01/05/2026
 
-### 2.1 — Remover DEV_BYPASS_AUTH
+### 2.1 — DEV_BYPASS desativado ✅
 
-O bypass foi criado para permitir testes locais enquanto o App Registration não existe.
-**Deve ser removido antes do primeiro deploy em produção.**
+- Container App `cepac-api`: `DEV_BYPASS_AUTH=false` (via `az containerapp update`)
+- 9 arquivos frontend: `const DEV_BYPASS = true` → `import.meta.env.VITE_DEV_BYPASS_AUTH === "true"`
 
-Arquivos a alterar:
-
-- `.env` → remover ou definir `DEV_BYPASS_AUTH=false`
-- `frontend/portal/.env` → remover `VITE_DEV_BYPASS_AUTH=true`
-- `frontend/dashboard/.env` → remover `VITE_DEV_BYPASS_AUTH=true`
-
-> O código do bypass (`DEV_BYPASS` em `ProtectedRoute`, `client.ts`, `main.tsx`,
-> `dependencies.py`) pode permanecer como flag de emergência, desde que a var
-> não esteja definida. Vite remove o código morto no build de produção.
-
-### 2.2 — Atualizar variáveis de ambiente da API
-
-Na cepac-api (Azure Container App ou `.env`):
+### 2.2 — Variáveis de ambiente da API ✅
 
 ```
-AZURE_AD_CLIENT_ID=<CLIENT_ID do Registro 1 — CEPAC-API>
-```
-
-```bash
-az containerapp update \
-  --name cepac-api \
-  --resource-group rg_spurbanismo_cepac \
-  --set-env-vars "AZURE_AD_CLIENT_ID=<CLIENT_ID>"
-```
-
-### 2.3 — Configurar GitHub Secrets restantes
-
-```bash
-gh secret set PORTAL_AZURE_CLIENT_ID   --body "<CLIENT_ID do Registro 2>" --repo ricardoabcosta/spurbanismo_cepac
-gh secret set DASHBOARD_AZURE_CLIENT_ID --body "<CLIENT_ID do Registro 2>" --repo ricardoabcosta/spurbanismo_cepac
-```
-
-> `PORTAL_AZURE_CLIENT_ID` e `DASHBOARD_AZURE_CLIENT_ID` usam o **mesmo** CLIENT_ID
-> (Registro 2 cobre os dois frontends).
-
-### 2.4 — Validar `.env` local e `.env` frontends
-
-`frontend/portal/.env`:
-```
-VITE_AZURE_CLIENT_ID=<CLIENT_ID do Registro 2>
-VITE_DEV_BYPASS_AUTH=    # deixar vazio ou remover
-```
-
-`frontend/dashboard/.env`: idem.
-
-`.env` (raiz):
-```
-AZURE_AD_CLIENT_ID=<CLIENT_ID do Registro 1>
+AZURE_AD_CLIENT_ID=e7525560-a7ae-4688-8ea9-6f1f923ef8c3
+AZURE_AD_TENANT_ID=f398df9c-fd0c-4829-a003-c770a1c4a063
 DEV_BYPASS_AUTH=false
 ```
 
----
+### 2.3 — GitHub Secrets ✅
 
-## Bloco 3 — Primeiro push CI/CD
-
-Pré-requisito: Bloco 2 concluído.
-
-### 3.1 — Disparar pipeline
-
-```bash
-git push origin main
+```
+ACR_LOGIN_SERVER          ✅ cepacregistry.azurecr.io
+ACR_USERNAME              ✅
+ACR_PASSWORD              ✅
+VITE_API_URL              ✅
+AZURE_AD_TENANT_ID        ✅ f398df9c-fd0c-4829-a003-c770a1c4a063
+PORTAL_AZURE_CLIENT_ID    ✅ 39d6d992-23d8-4abf-b9a0-9b0f89bfe8bf
+DASHBOARD_AZURE_CLIENT_ID ✅ 39d6d992-23d8-4abf-b9a0-9b0f89bfe8bf
+AZURE_AD_API_CLIENT_ID    ✅ e7525560-a7ae-4688-8ea9-6f1f923ef8c3
 ```
 
-O pipeline `.github/workflows/ci.yml` irá:
-1. `lint` → `typecheck` → `test-unit` → `test-integ`
-2. Build das imagens Docker (API, Portal, Dashboard) com os `VITE_*` injetados
-3. Push para `cepacregistry.azurecr.io`
-4. Deploy nos Container Apps via `az containerapp update --image`
+### 2.4 — `.env.production` dos frontends ✅
 
-### 3.2 — Verificar deploy
+Ambos `frontend/portal/.env.production` e `frontend/dashboard/.env.production`:
+
+```
+VITE_DEV_BYPASS_AUTH=false
+VITE_API_BASE_URL=https://cepac-api.redpond-877494a8.eastus.azurecontainerapps.io
+VITE_AZURE_CLIENT_ID=39d6d992-23d8-4abf-b9a0-9b0f89bfe8bf
+VITE_AZURE_API_CLIENT_ID=e7525560-a7ae-4688-8ea9-6f1f923ef8c3
+VITE_AZURE_TENANT_ID=f398df9c-fd0c-4829-a003-c770a1c4a063
+```
+
+### 2.5 — Correção de bug: audience JWT ✅
+
+`src/api/auth/azure_ad.py`: tokens v2.0 têm `aud: "api://<client_id>"`. Corrigido para aceitar
+`[client_id, "api://client_id"]` — evita `InvalidAudienceError` no primeiro login real.
+
+---
+
+## Bloco 3 — CI/CD e Deploy ✅ CONCLUÍDO
+
+**Concluído em:** 01/05/2026
+
+### Fixes aplicados ao longo do processo
+
+| Fix | Arquivo(s) | Commit |
+|---|---|---|
+| `--workers 2` incompatível com Container Apps | `infra/Dockerfile` | `02ec3a5` |
+| `.dockerignore` excluía `frontend/dist/` do build context | `.dockerignore` | `ee827ef` |
+| Migrations 008–014 ausentes no conftest de testes | `tests/integration/conftest.py` | `1fe9621` |
+| `Event loop is closed` no pytest-asyncio 0.23 | `tests/integration/conftest.py`, `pytest.ini` | `bbe53bf` |
+| `datetime` aware em coluna `TIMESTAMP WITHOUT TIME ZONE` | `src/api/auth/dependencies.py` | `1169180` |
+| `audience` JWT sem prefixo `api://` | `src/api/auth/azure_ad.py` | `4b22542` |
+| Credencial SSH para GitHub (dois accounts) | `~/.ssh/config` | — |
+
+### Estado atual das imagens (01/05/2026)
+
+- `cepacregistry.azurecr.io/cepac-api:sha-4d7d481` — com `DEV_BYPASS_AUTH=false`
+- `cepacregistry.azurecr.io/cepac-portal:sha-4d7d481` — MSAL real, VITE_DEV_BYPASS_AUTH=false
+- `cepacregistry.azurecr.io/cepac-dashboard:sha-4d7d481` — MSAL real, VITE_DEV_BYPASS_AUTH=false
+
+### Verificar deploy
 
 ```bash
-# Health check da API
 curl https://cepac-api.redpond-877494a8.eastus.azurecontainerapps.io/health
 
-# Logs em tempo real
 az containerapp logs show --name cepac-api --resource-group rg_spurbanismo_cepac --follow
 az containerapp logs show --name cepac-portal --resource-group rg_spurbanismo_cepac --follow
-az containerapp logs show --name cepac-dashboard --resource-group rg_spurbanismo_cepac --follow
 ```
-
-### 3.3 — Primeiro login real
-
-Acessar `https://cepac-portal.redpond-877494a8.eastus.azurecontainerapps.io` e logar
-com uma conta do tenant SP Urbanismo. O primeiro login cria o usuário no banco com
-`papel=TECNICO` (Decisão D4).
 
 ---
 
-## Bloco 4 — Blob Storage (documentos de processo)
+## Bloco 3b — Testes de integração ✅ CONCLUÍDO
 
-Pré-requisito: Bloco 3 concluído (API rodando com imagem real).
+**Concluído em:** 01/05/2026 — commit `4db34d1`
 
-### 4.1 — Obter chave da Storage Account
-
-```bash
-az storage account keys list \
-  --account-name cepacstorageacct \
-  --resource-group rg_spurbanismo_cepac \
-  --query "[0].value" -o tsv
-```
-
-### 4.2 — Criar container de documentos
-
-```bash
-az storage container create \
-  --name cepac-documentos \
-  --account-name cepacstorageacct \
-  --public-access off
-```
-
-### 4.3 — Configurar na API
-
-```bash
-az containerapp update \
-  --name cepac-api \
-  --resource-group rg_spurbanismo_cepac \
-  --set-env-vars \
-    "AZURE_BLOB_ACCOUNT_NAME=cepacstorageacct" \
-    "AZURE_BLOB_ACCOUNT_KEY=<CHAVE>" \
-    "AZURE_BLOB_CONTAINER_NAME=cepac-documentos"
-```
-
-Atualizar também `.env` local para testes.
-
-### 4.4 — Testar upload de documento
-
-Via Portal: abrir uma solicitação existente → aba Documentos → fazer upload de um PDF.
-Verificar que o blob aparece em `cepacstorageacct / cepac-documentos`.
+| Teste | Causa | Correção aplicada |
+|---|---|---|
+| `test_primeiro_login_cria_tecnico` | `datetime` aware em coluna `TIMESTAMP WITHOUT TIME ZONE` | `datetime.now(tz=timezone.utc).replace(tzinfo=None)` em `dependencies.py` |
+| `test_post_medicao_nova` | Seed `006` já ocupa 2026-10-01 | Payload alterado para 2027-03-01 |
+| `test_post_medicao_data_duplicada_retorna_422` | Efeito cascata do teste acima | Payload alterado para 2027-04-01 |
+| `test_criar_solicitacao_pendente` | Status inicial é `EM_ANALISE`, não `PENDENTE` (legado) | Asserção e docstring corrigidos em `test_portal.py` |
+| `test_cancelar_nao_pendente_retorna_422` | `exception_handler(422)` stringificava `exc.detail` dict | `app.py`: `detail = exc.detail if isinstance(exc.detail, dict) else str(exc)` |
 
 ---
 
-## Bloco 5 — Acesso inicial e configuração de usuários
+## Bloco 4 — Primeiro login real ⏳ PENDENTE
 
-### 5.1 — Promover primeiro DIRETOR
+Pré-requisito: Bloco 3 concluído ✅
 
-O primeiro usuário que logar vira TECNICO (D4). Para promover a DIRETOR:
+### 4.1 — Acessar o Portal
+
+Abrir `https://cepac-portal.redpond-877494a8.eastus.azurecontainerapps.io` com uma conta
+do tenant SP Urbanismo (`@spurbanismo.sp.gov.br`). O primeiro login cria o usuário no banco
+com `papel=TECNICO` (Decisão D4).
+
+### 4.2 — Promover primeiro DIRETOR
+
+O primeiro usuário que logar vira TECNICO. No bootstrap inicial, promover diretamente no banco:
+
+```sql
+UPDATE usuario SET papel = 'DIRETOR' WHERE upn = 'seu.email@spurbanismo.sp.gov.br';
+```
+
+Após ter um DIRETOR logado, os demais podem ser promovidos via endpoint:
 
 ```bash
-# Descobrir o ID do usuário após o primeiro login
-curl -H "Authorization: Bearer <TOKEN>" \
+# Listar usuários
+curl -H "Authorization: Bearer <TOKEN_DIRETOR>" \
   https://cepac-api.redpond-877494a8.eastus.azurecontainerapps.io/admin/usuarios
 
 # Promover
@@ -215,17 +185,68 @@ curl -X PATCH \
   https://cepac-api.redpond-877494a8.eastus.azurecontainerapps.io/admin/usuarios/<UUID>/papel
 ```
 
-> No bootstrap inicial, usar o banco diretamente:
-> ```sql
-> UPDATE usuario SET papel = 'DIRETOR' WHERE upn = 'seu.email@spurbanismo.sp.gov.br';
-> ```
-
-### 5.2 — Validar dados no Dashboard
+### 4.3 — Validar dados no Dashboard
 
 Acessar `https://cepac-dashboard.redpond-877494a8.eastus.azurecontainerapps.io` e conferir:
 - Big Numbers: CEPACs em circulação = 193.779
 - Saldos por setor batem com a planilha `OUCAE_ESTOQUE_abr_rv01.xlsx`
 - Velocímetro 2029 indica percentual correto a partir de 01/01/2004
+
+---
+
+## Bloco 5 — Blob Storage (documentos de processo) ⏳ PENDENTE
+
+Pré-requisito: Bloco 4 concluído.
+
+### 5.1 — Criar container de documentos
+
+```bash
+az storage container create \
+  --name cepac-documentos \
+  --account-name cepacstorageacct \
+  --public-access off
+```
+
+### 5.2 — Configurar na API
+
+```bash
+KEY=$(az storage account keys list \
+  --account-name cepacstorageacct \
+  --resource-group rg_spurbanismo_cepac \
+  --query "[0].value" -o tsv)
+
+az containerapp update \
+  --name cepac-api \
+  --resource-group rg_spurbanismo_cepac \
+  --set-env-vars \
+    "AZURE_BLOB_ACCOUNT_NAME=cepacstorageacct" \
+    "AZURE_BLOB_ACCOUNT_KEY=$KEY" \
+    "AZURE_BLOB_CONTAINER_NAME=cepac-documentos"
+```
+
+### 5.3 — Testar upload de documento
+
+Via Portal: abrir uma solicitação existente → aba Documentos → fazer upload de um PDF.
+Verificar que o blob aparece em `cepacstorageacct / cepac-documentos`.
+
+---
+
+## Bloco 6 — Melhoria de cálculo de saldo (planejado)
+
+Identificado durante validação dos dados do dashboard (01/05/2026).
+
+**Problema:** o cálculo de `total_consumido` nos setores considera todas as movimentações,
+incluindo as de desvinculação. Desvinculações devem ser excluídas do consumo (o setor
+"devolve" área quando uma proposta é desvinculada).
+
+**Decisão:** filtrar `proposta.requerimento != 'DESVINCULACAO'` no cálculo do saldo por setor.
+
+**Arquivos afetados:**
+- `src/core/repositories/saldo_repository.py` — `calcular_saldo()`
+- `src/core/repositories/dashboard_repository.py` — `calcular_ocupacao_setores()`
+- Testes correspondentes
+
+**Estado:** planejado, não implementado.
 
 ---
 
@@ -242,3 +263,5 @@ Acessar `https://cepac-dashboard.redpond-877494a8.eastus.azurecontainerapps.io` 
 | Tenant ID | `f398df9c-fd0c-4829-a003-c770a1c4a063` |
 | Subscription | `506f92c4-471f-4f5f-8b5c-9ff96ad5ce8c` |
 | Resource Group | `rg_spurbanismo_cepac` |
+| App Reg API Client ID | `e7525560-a7ae-4688-8ea9-6f1f923ef8c3` |
+| App Reg Frontend Client ID | `39d6d992-23d8-4abf-b9a0-9b0f89bfe8bf` |

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -110,8 +110,6 @@ _DEV_BYPASS_NOME = "Dev Bypass (local)"
 
 async def _get_dev_bypass_user(session: AsyncSession) -> UsuarioAutenticado:
     """Upsert do usuário de bypass e retorno como TECNICO. Apenas em DEV_BYPASS_AUTH=true."""
-    from datetime import datetime, timedelta, timezone
-
     stmt = select(Usuario).where(Usuario.upn == _DEV_BYPASS_UPN)
     result = await session.execute(stmt)
     usuario = result.scalar_one_or_none()

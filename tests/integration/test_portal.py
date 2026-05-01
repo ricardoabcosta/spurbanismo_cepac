@@ -34,10 +34,13 @@ async def _pegar_titulo_disponivel(db: AsyncSession) -> TituloCepac:
         select(TituloCepac)
         .options(selectinload(TituloCepac.setor))
         .where(TituloCepac.estado == EstadoTituloEnum.DISPONIVEL)
+        .where(TituloCepac.setor_id.in_(
+            select(Setor.id).where(Setor.bloqueio_nr == False)
+        ))
         .limit(1)
     )
     titulo = result.scalar_one_or_none()
-    assert titulo is not None, "Nenhum título DISPONIVEL encontrado no banco de teste"
+    assert titulo is not None, "Nenhum título DISPONIVEL encontrado em setor não-bloqueado"
     return titulo
 
 

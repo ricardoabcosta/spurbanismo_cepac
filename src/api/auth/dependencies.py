@@ -79,7 +79,7 @@ async def _upsert_usuario(session: AsyncSession, payload: TokenPayload) -> Usuar
     result = await session.execute(stmt)
     usuario = result.scalar_one_or_none()
 
-    agora = datetime.utcnow()
+    agora = datetime.now(tz=timezone.utc)
 
     if usuario is None:
         logger.info("Primeiro login: criando usuario upn=%s", payload.upn)
@@ -120,7 +120,7 @@ async def _get_dev_bypass_user(session: AsyncSession) -> UsuarioAutenticado:
             nome=_DEV_BYPASS_NOME,
             papel=PapelUsuarioEnum.TECNICO,
             ativo=True,
-            last_login_at=datetime.utcnow(),
+            last_login_at=datetime.now(tz=timezone.utc),
         )
         session.add(usuario)
         await session.flush()

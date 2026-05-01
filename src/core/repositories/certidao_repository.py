@@ -6,6 +6,7 @@ Sem lógica de negócio — apenas acesso a dados.
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from sqlalchemy import select
@@ -72,8 +73,8 @@ async def listar_com_filtros(
         stmt = stmt.where(
             Certidao.data_emissao.isnot(None),
         ).where(
-            Certidao.data_emissao >= f"{ano}-01-01",
-            Certidao.data_emissao <= f"{ano}-12-31",
+            Certidao.data_emissao >= date(ano, 1, 1),
+            Certidao.data_emissao <= date(ano, 12, 31),
         )
 
     result = await session.execute(stmt)

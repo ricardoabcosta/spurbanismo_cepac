@@ -1,5 +1,7 @@
-# Node / frontend
+# Node / frontend — exclui fontes, mantém dist/ pré-compilado para builds de imagem
 frontend/
+!frontend/portal/dist/
+!frontend/dashboard/dist/
 node_modules/
 
 # Tests

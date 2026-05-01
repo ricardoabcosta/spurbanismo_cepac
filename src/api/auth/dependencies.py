@@ -149,22 +149,27 @@ async def get_current_user(
         return await _get_dev_bypass_user(session)
 
     if credentials is None:
+        logger.warning("Token ausente no header Authorization")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de autenticação ausente.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    logger.debug("Validando token JWT...")
     token_payload = await validate_token(
         token=credentials.credentials,
         tenant_id=settings.azure_ad_tenant_id or "",
         client_id=settings.azure_ad_client_id or "",
     )
+    logger.debug("Token válido: upn=%s", token_payload.upn)
 
     usuario = await _upsert_usuario(session, token_payload)
     await session.commit()
+    logger.debug("Usuário upsertado: id=%s papel=%s ativo=%s", usuario.id, usuario.papel, usuario.ativo)
 
     if not usuario.ativo:
+        logger.warning("Usuário desativado: upn=%s", usuario.upn)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuário desativado.",

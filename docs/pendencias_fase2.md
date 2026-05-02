@@ -1,7 +1,7 @@
 # Pendências Fase 2 — CEPAC SP Urbanismo
 
 > Documento de controle das atividades que restam para finalizar a Fase 2 em produção.
-> Atualizado em: 02/05/2026 (fixes portal auth + nginx cache + deploy)
+> Atualizado em: 02/05/2026 (Bloco 4 e 5 concluídos — sistema Fase 2 operacional)
 
 ---
 
@@ -20,7 +20,8 @@
 | Testes de integração | ✅ 35/35 passando local e no CI (commit b32535b) | 01/05/2026 |
 | Bugs do portal (auth + cache) | ✅ Corrigidos e em produção (commit 9e8de63) | 02/05/2026 |
 | Primeiro login real | ✅ Confirmado — portal e dashboard | 02/05/2026 |
-| Blob Storage funcional | ⏳ Pendente | — |
+| Primeiro DIRETOR promovido | ✅ ricardoabinader@prodam.sp.gov.br | 02/05/2026 |
+| Blob Storage funcional | ✅ Container criado + API configurada | 02/05/2026 |
 
 ---
 
@@ -222,7 +223,7 @@ try {
 
 ## Bloco 4 — Primeiro login real ✅ CONCLUÍDO
 
-**Concluído em:** 02/05/2026 — login confirmado no portal e no dashboard com conta `@prodam.sp.gov.br`.
+**Concluído em:** 02/05/2026 — login confirmado no portal e no dashboard; `ricardoabinader@prodam.sp.gov.br` promovido a DIRETOR.
 
 Pré-requisito: Bloco 3c concluído ✅
 
@@ -236,12 +237,13 @@ Abrir `https://cepac-portal.redpond-877494a8.eastus.azurecontainerapps.io` com u
 do tenant SP Urbanismo (`@spurbanismo.sp.gov.br`). O primeiro login cria o usuário no banco
 com `papel=TECNICO` (Decisão D4).
 
-### 4.2 — Promover primeiro DIRETOR
+### 4.2 — Promover primeiro DIRETOR ✅
 
-O primeiro usuário que logar vira TECNICO. No bootstrap inicial, promover diretamente no banco:
+Executado via psql em 02/05/2026:
 
 ```sql
-UPDATE usuario SET papel = 'DIRETOR' WHERE upn = 'seu.email@spurbanismo.sp.gov.br';
+UPDATE usuario SET papel = 'DIRETOR' WHERE upn = 'ricardoabinader@prodam.sp.gov.br';
+-- id: edc42106-7059-4647-8ea8-f6ac7c59e308
 ```
 
 Após ter um DIRETOR logado, os demais podem ser promovidos via endpoint:
@@ -268,40 +270,28 @@ Acessar `https://cepac-dashboard.redpond-877494a8.eastus.azurecontainerapps.io` 
 
 ---
 
-## Bloco 5 — Blob Storage (documentos de processo) ⏳ PENDENTE
+## Bloco 5 — Blob Storage (documentos de processo) ✅ CONCLUÍDO
 
-Pré-requisito: Bloco 4 concluído.
+**Concluído em:** 02/05/2026
 
-### 5.1 — Criar container de documentos
+### 5.1 — Container de documentos ✅
 
-```bash
-az storage container create \
-  --name cepac-documentos \
-  --account-name cepacstorageacct \
-  --public-access off
+Container `cepac-documentos` criado em 17/04/2026 (provisionamento inicial), acesso privado.
+Confirmado em 02/05/2026 via `az storage container show` — vazio, aguardando primeiro upload real.
+
+### 5.2 — API configurada ✅
+
+Env vars já presentes na Container App `cepac-api` desde o provisionamento:
+
+```
+AZURE_BLOB_ACCOUNT_NAME    = cepacstorageacct
+AZURE_BLOB_ACCOUNT_KEY     → secretRef: blob-account-key
+AZURE_BLOB_CONTAINER_NAME  = cepac-documentos
 ```
 
-### 5.2 — Configurar na API
+### 5.3 — Teste de upload
 
-```bash
-KEY=$(az storage account keys list \
-  --account-name cepacstorageacct \
-  --resource-group rg_spurbanismo_cepac \
-  --query "[0].value" -o tsv)
-
-az containerapp update \
-  --name cepac-api \
-  --resource-group rg_spurbanismo_cepac \
-  --set-env-vars \
-    "AZURE_BLOB_ACCOUNT_NAME=cepacstorageacct" \
-    "AZURE_BLOB_ACCOUNT_KEY=$KEY" \
-    "AZURE_BLOB_CONTAINER_NAME=cepac-documentos"
-```
-
-### 5.3 — Testar upload de documento
-
-Via Portal: abrir uma solicitação existente → aba Documentos → fazer upload de um PDF.
-Verificar que o blob aparece em `cepacstorageacct / cepac-documentos`.
+Pendente confirmação manual via Portal (abrir solicitação → aba Documentos → upload PDF).
 
 ---
 

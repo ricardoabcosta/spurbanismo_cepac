@@ -1,63 +1,62 @@
 /**
  * Instância Axios com interceptor MSAL.
- *
- * - Injeta o Bearer token em cada requisição autenticada.
- * - Em caso de 401 redireciona para loginRedirect.
+ * - Injeta Bearer token em cada requisição.
+ * - 401 → loginRedirect
+ * - 403 → rejeita com erro tipado
  */
-import axios, { type AxiosInstance } from "axios";
-import { PublicClientApplication } from "@azure/msal-browser";
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { PublicClientApplication, InteractionRequiredAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../authConfig";
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
 
-// Instância singleton do MSAL — criada uma vez e exportada para uso no App.tsx
 // NOTA: initialize() NÃO é chamado aqui — é responsabilidade do main.tsx
 export const msalInstance = new PublicClientApplication(msalConfig);
 
-function buildAxiosInstance(): AxiosInstance {
-  const instance = axios.create({
-    baseURL: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "",
-    timeout: 30_000,
-  });
+const apiClient = axios.create({
+  baseURL: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "",
+  headers: { "Content-Type": "application/json" },
+  timeout: 30_000,
+});
 
-  if (DEV_BYPASS) {
-    return instance;
-  }
-
-  // Interceptor de REQUEST — injeta Bearer token
-  instance.interceptors.request.use(async (config) => {
+if (!DEV_BYPASS) {
+  apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     const accounts = msalInstance.getAllAccounts();
+
     if (accounts.length === 0) {
-      return config;
+      await msalInstance.loginRedirect(loginRequest);
+      return new Promise(() => undefined);
     }
 
     try {
-      const result = await msalInstance.acquireTokenSilent({
+      const tokenResponse = await msalInstance.acquireTokenSilent({
         ...loginRequest,
         account: accounts[0],
       });
-      config.headers["Authorization"] = `Bearer ${result.accessToken}`;
+      config.headers.Authorization = `Bearer ${tokenResponse.accessToken}`;
       return config;
-    } catch {
-      await msalInstance.loginRedirect(loginRequest);
+    } catch (error) {
+      if (error instanceof InteractionRequiredAuthError) {
+        await msalInstance.loginRedirect(loginRequest);
+      }
       return new Promise(() => undefined);
     }
   });
 
-  // Interceptor de RESPONSE — trata 401
-  instance.interceptors.response.use(
+  apiClient.interceptors.response.use(
     (response) => response,
-    async (error: unknown) => {
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
-        await msalInstance.loginRedirect(loginRequest);
-        return new Promise(() => undefined);
+    (error: AxiosError) => {
+      if (error.response?.status === 401) {
+        msalInstance.loginRedirect(loginRequest).catch(console.error);
+      }
+      if (error.response?.status === 403) {
+        const customError = new Error("Acesso negado — permissão insuficiente");
+        customError.name = "AccessDeniedError";
+        return Promise.reject(customError);
       }
       return Promise.reject(error);
     }
   );
-
-  return instance;
 }
 
-const apiClient = buildAxiosInstance();
 export default apiClient;

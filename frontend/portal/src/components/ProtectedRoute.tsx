@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (DEV_BYPASS) return <>{children}</>;
 
-  // MSAL ainda está inicializando — não redireciona ainda
+  // MSAL ainda está inicializando — não renderiza nada ainda
   if (inProgress !== "none") {
     return <div style={{ padding: "2rem", textAlign: "center", fontFamily: "system-ui, sans-serif" }}>Carregando...</div>;
   }
@@ -27,5 +27,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Só renderiza o children se estiver autenticado
   return <>{children}</>;
 }

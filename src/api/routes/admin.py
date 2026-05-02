@@ -1,11 +1,15 @@
 """
-Rotas administrativas — setores e configuração global da operação.
+Rotas administrativas — setores, configuração global e gestão de usuários.
 
-GET  /admin/setores          → require_tecnico  (leitura para combobox)
-POST /admin/setores          → require_diretor  (criação)
-PUT  /admin/setores/{id}     → require_diretor  (edição completa)
-GET  /admin/configuracao     → require_tecnico  (leitura)
-PUT  /admin/configuracao     → require_diretor  (edição)
+GET   /admin/setores                       → require_tecnico  (leitura para combobox)
+POST  /admin/setores                       → require_diretor  (criação)
+PUT   /admin/setores/{id}                  → require_diretor  (edição completa)
+GET   /admin/configuracao                  → require_tecnico  (leitura)
+PUT   /admin/configuracao                  → require_diretor  (edição)
+GET   /admin/me                            → require_tecnico  (perfil do autenticado)
+GET   /admin/usuarios                      → require_diretor  (lista todos os usuários)
+PATCH /admin/usuarios/{id}/papel           → require_diretor  (altera papel)
+PATCH /admin/usuarios/{id}/ativo           → require_diretor  (ativa/desativa)
 """
 from datetime import datetime
 from typing import Annotated
@@ -17,9 +21,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.auth.dependencies import UsuarioAutenticado, require_diretor, require_tecnico
 from src.api.dependencies import get_db
-from src.api.schemas.admin import ConfiguracaoIn, ConfiguracaoOut, SetorIn, SetorOut
+from src.api.schemas.admin import (
+    AtivoUpdate,
+    ConfiguracaoIn,
+    ConfiguracaoOut,
+    PapelUpdate,
+    SetorIn,
+    SetorOut,
+    UsuarioOut,
+)
 from src.core.models.configuracao_operacao import ConfiguracaoOperacao
 from src.core.models.setor import Setor
+from src.core.models.usuario import Usuario
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -146,3 +159,92 @@ async def atualizar_configuracao(
     await session.commit()
     await session.refresh(cfg)
     return ConfiguracaoOut.model_validate(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Gestão de usuários
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/me",
+    response_model=UsuarioOut,
+    summary="Perfil do usuário autenticado",
+)
+async def meu_perfil(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+) -> UsuarioOut:
+    result = await session.execute(select(Usuario).where(Usuario.id == current_user.id))
+    usuario = result.scalar_one_or_none()
+    if usuario is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+    return UsuarioOut.model_validate(usuario)
+
+
+@router.get(
+    "/usuarios",
+    response_model=list[UsuarioOut],
+    summary="Listar todos os usuários",
+)
+async def listar_usuarios(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> list[UsuarioOut]:
+    # NULLS LAST: usuários sem nome aparecem ao final
+    result = await session.execute(
+        select(Usuario).order_by(Usuario.nome.asc().nulls_last())
+    )
+    usuarios = result.scalars().all()
+    return [UsuarioOut.model_validate(u) for u in usuarios]
+
+
+@router.patch(
+    "/usuarios/{usuario_id}/papel",
+    response_model=UsuarioOut,
+    summary="Alterar papel de um usuário",
+)
+async def alterar_papel(
+    usuario_id: UUID,
+    payload: PapelUpdate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> UsuarioOut:
+    if usuario_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Você não pode alterar seu próprio perfil.",
+        )
+    result = await session.execute(select(Usuario).where(Usuario.id == usuario_id))
+    usuario = result.scalar_one_or_none()
+    if usuario is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+    usuario.papel = payload.papel
+    await session.commit()
+    await session.refresh(usuario)
+    return UsuarioOut.model_validate(usuario)
+
+
+@router.patch(
+    "/usuarios/{usuario_id}/ativo",
+    response_model=UsuarioOut,
+    summary="Ativar ou desativar um usuário",
+)
+async def alterar_ativo(
+    usuario_id: UUID,
+    payload: AtivoUpdate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> UsuarioOut:
+    if usuario_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Você não pode desativar sua própria conta.",
+        )
+    result = await session.execute(select(Usuario).where(Usuario.id == usuario_id))
+    usuario = result.scalar_one_or_none()
+    if usuario is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+    usuario.ativo = payload.ativo
+    await session.commit()
+    await session.refresh(usuario)
+    return UsuarioOut.model_validate(usuario)

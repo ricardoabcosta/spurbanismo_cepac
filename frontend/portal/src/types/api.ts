@@ -299,3 +299,19 @@ export interface SetorBasico {
   id: string;
   nome: string;
 }
+
+// ---------------------------------------------------------------------------
+// Usuários (admin)
+// ---------------------------------------------------------------------------
+
+export type PapelUsuario = "TECNICO" | "DIRETOR";
+
+export interface UsuarioOut {
+  id: string;
+  upn: string;
+  nome: string | null;
+  papel: PapelUsuario;
+  ativo: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}

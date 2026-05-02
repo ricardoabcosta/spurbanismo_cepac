@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { listarPropostasAE, listarSetores } from "../api/portal";
 import PaginacaoControle from "../components/PaginacaoControle";
+import { useUser } from "../contexts/UserContext";
 import type { PropostaListItem, SetorBasico } from "../types/api";
 
 // ---------------------------------------------------------------------------
@@ -191,6 +192,7 @@ export default function PropostasPage() {
   // UI states
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [hoveredAdm, setHoveredAdm] = useState(false);
+  const [hoveredUsuarios, setHoveredUsuarios] = useState(false);
   const [hoveredNova, setHoveredNova] = useState(false);
   const [hoveredDash, setHoveredDash] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -199,6 +201,7 @@ export default function PropostasPage() {
 
   const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
   const { instance, accounts } = useMsal();
+  const { isDiretor } = useUser();
   const nomeUsuario = DEV_BYPASS ? "Administrador" : (accounts[0]?.name ?? "Usuário");
   const iniciais = nomeUsuario
     .split(" ")
@@ -387,6 +390,28 @@ export default function PropostasPage() {
               >
                 Administração
               </button>
+
+              {/* Usuários — visível apenas para DIRETOR */}
+              {isDiretor && (
+                <button
+                  style={{
+                    background: hoveredUsuarios ? "rgba(255,255,255,0.12)" : "transparent",
+                    border: "none",
+                    color: "rgba(255,255,255,0.95)",
+                    padding: "7px 16px",
+                    borderRadius: 5,
+                    cursor: "pointer",
+                    fontSize: 15,
+                    fontWeight: 600,
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={() => setHoveredUsuarios(true)}
+                  onMouseLeave={() => setHoveredUsuarios(false)}
+                  onClick={() => navigate("/admin/usuarios")}
+                >
+                  Usuários
+                </button>
+              )}
 
               {/* Separador */}
               <div style={{ width: 1, height: 26, background: "rgba(255,255,255,0.2)", margin: "0 6px" }} />

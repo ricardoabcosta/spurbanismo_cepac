@@ -10,6 +10,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from src.core.models.enums import PapelUsuarioEnum
+
 
 class SetorIn(BaseModel):
     """Payload para criar ou atualizar um setor."""
@@ -64,3 +66,26 @@ class ConfiguracaoOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UsuarioOut(BaseModel):
+    """Representação de um usuário para o cliente."""
+    id: UUID
+    upn: str
+    nome: Optional[str]
+    papel: PapelUsuarioEnum
+    ativo: bool
+    created_at: datetime
+    last_login_at: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
+
+class PapelUpdate(BaseModel):
+    """Payload para alterar o papel de um usuário."""
+    papel: PapelUsuarioEnum
+
+
+class AtivoUpdate(BaseModel):
+    """Payload para ativar ou desativar um usuário."""
+    ativo: bool

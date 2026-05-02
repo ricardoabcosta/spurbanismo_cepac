@@ -19,7 +19,7 @@
 | CI/CD — builds e deploy | ✅ Pipeline totalmente verde (commit 07167b5) | 01/05/2026 |
 | Testes de integração | ✅ 35/35 passando local e no CI (commit b32535b) | 01/05/2026 |
 | Bugs do portal (auth + cache) | ✅ Corrigidos e em produção (commit 9e8de63) | 02/05/2026 |
-| Primeiro login real | ⏳ Em validação | 02/05/2026 |
+| Primeiro login real | ✅ Confirmado — portal e dashboard | 02/05/2026 |
 | Blob Storage funcional | ⏳ Pendente | — |
 
 ---
@@ -220,7 +220,9 @@ try {
 
 ---
 
-## Bloco 4 — Primeiro login real ⏳ EM VALIDAÇÃO
+## Bloco 4 — Primeiro login real ✅ CONCLUÍDO
+
+**Concluído em:** 02/05/2026 — login confirmado no portal e no dashboard com conta `@prodam.sp.gov.br`.
 
 Pré-requisito: Bloco 3c concluído ✅
 

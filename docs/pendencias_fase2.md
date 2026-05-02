@@ -1,7 +1,7 @@
 # Pendências Fase 2 — CEPAC SP Urbanismo
 
 > Documento de controle das atividades que restam para finalizar a Fase 2 em produção.
-> Atualizado em: 02/05/2026 (Bloco 4 e 5 concluídos — sistema Fase 2 operacional)
+> Atualizado em: 02/05/2026 (Bloco 7 concluído — gerenciamento de usuários via portal)
 
 ---
 
@@ -17,11 +17,14 @@
 | GitHub Secrets (completo) | ✅ ACR + VITE_API_URL + TENANT_ID + CLIENT_IDs | 01/05/2026 |
 | DEV_BYPASS desativado | ✅ Container App + código frontend | 01/05/2026 |
 | CI/CD — builds e deploy | ✅ Pipeline totalmente verde (commit 07167b5) | 01/05/2026 |
+| CI/CD — deploy automático | ⏳ Job `deploy` adicionado, aguarda `AZURE_CREDENTIALS` | 02/05/2026 |
 | Testes de integração | ✅ 35/35 passando local e no CI (commit b32535b) | 01/05/2026 |
 | Bugs do portal (auth + cache) | ✅ Corrigidos e em produção (commit 9e8de63) | 02/05/2026 |
 | Primeiro login real | ✅ Confirmado — portal e dashboard | 02/05/2026 |
 | Primeiro DIRETOR promovido | ✅ ricardoabinader@prodam.sp.gov.br | 02/05/2026 |
 | Blob Storage funcional | ✅ Container criado + API configurada | 02/05/2026 |
+| Gerenciamento de usuários (Bloco 7) | ✅ T22 backend + T23 frontend em produção | 02/05/2026 |
+| Deploy automático CI → Azure | ⏳ Aguarda secret `AZURE_CREDENTIALS` no GitHub | 02/05/2026 |
 
 ---
 
@@ -129,13 +132,15 @@ VITE_AZURE_TENANT_ID=f398df9c-fd0c-4829-a003-c770a1c4a063
 - `cepacregistry.azurecr.io/cepac-portal:sha-4d7d481` — MSAL real, VITE_DEV_BYPASS_AUTH=false
 - `cepacregistry.azurecr.io/cepac-dashboard:sha-4d7d481` — MSAL real, VITE_DEV_BYPASS_AUTH=false
 
-### Estado atual das imagens (02/05/2026)
+### Estado atual das imagens (02/05/2026 — Bloco 7 em produção)
 
-- `cepacregistry.azurecr.io/cepac-api:sha-3aef710` — logs DEBUG ativos (sem mudança funcional)
-- `cepacregistry.azurecr.io/cepac-portal:sha-9e8de63` — interceptor Axios corrigido + nginx no-store
-- `cepacregistry.azurecr.io/cepac-dashboard:sha-9e8de63` — nginx no-store
+- `cepacregistry.azurecr.io/cepac-api:sha-05c693c` — Bloco 7 backend (`GET /admin/me` + gestão usuários)
+- `cepacregistry.azurecr.io/cepac-portal:sha-05c693c` — Bloco 7 frontend (UserContext + `/admin/usuarios`)
+- `cepacregistry.azurecr.io/cepac-dashboard:sha-05c693c` — sem mudanças funcionais
 
-Revisões ativas: `cepac-portal--0000019`, `cepac-dashboard--0000013`
+Revisões ativas: `cepac-api--0000020`, `cepac-portal--0000021`, `cepac-dashboard--0000015`
+
+> **Nota:** script `scripts/deploy.sh --status` mostra em tempo real o que cada Container App está rodando vs o que existe no ACR.
 
 ### Verificar deploy
 
@@ -292,6 +297,112 @@ AZURE_BLOB_CONTAINER_NAME  = cepac-documentos
 ### 5.3 — Teste de upload
 
 Pendente confirmação manual via Portal (abrir solicitação → aba Documentos → upload PDF).
+
+---
+
+## Bloco 7 — Gerenciamento de usuários via portal ✅ CONCLUÍDO
+
+**Concluído em:** 02/05/2026 — commits `9bb2900` (código) + deploy manual para `sha-05c693c`
+
+### O que foi implementado
+
+Tela `/admin/usuarios` no portal, acessível apenas para conta com papel `DIRETOR`.
+Elimina a necessidade de acionar a API diretamente para promover ou desativar usuários.
+
+| Componente | Arquivo | Descrição |
+|---|---|---|
+| Backend — schemas | `src/api/schemas/admin.py` | `UsuarioOut`, `PapelUpdate`, `AtivoUpdate` |
+| Backend — rotas | `src/api/routes/admin.py` | `GET /admin/me`, `GET /admin/usuarios`, `PATCH .../papel`, `PATCH .../ativo` |
+| Frontend — tipos | `frontend/portal/src/types/api.ts` | `PapelUsuario`, `UsuarioOut` |
+| Frontend — API | `frontend/portal/src/api/admin.ts` | `getMeuPerfil`, `listarUsuarios`, `alterarPapel`, `alterarAtivo` |
+| Frontend — contexto | `frontend/portal/src/contexts/UserContext.tsx` | Busca `GET /admin/me` após auth MSAL, expõe `isDiretor` |
+| Frontend — página | `frontend/portal/src/pages/UsuariosAdminPage.tsx` | Tabela com select de perfil + toggle ativo/inativo |
+| Frontend — rota | `frontend/portal/src/App.tsx` | `/admin/usuarios` + `UserProvider` |
+| Frontend — nav | `frontend/portal/src/pages/PropostasPage.tsx` | Botão "Usuários" visível apenas para `isDiretor` |
+
+### Comportamento
+
+- Usuários criados automaticamente no primeiro login Azure AD (`papel=TECNICO`)
+- DIRETOR vê botão "Usuários" na nav bar → acessa `/admin/usuarios`
+- TECNICO não vê o botão; URL direta retorna 403 do backend
+- Na tabela: a própria conta tem select/toggle desabilitados (guarda contra auto-promoção/desativação)
+
+---
+
+## Bloco 8 — Deploy automático CI → Azure ⏳ PENDENTE
+
+**Problema identificado em:** 02/05/2026
+
+O CI constrói e faz push das imagens para o ACR mas **não atualiza os Container Apps**.
+Isso cria um gap silencioso: ACR tem imagem nova, Azure continua rodando a antiga.
+
+### O que já foi feito
+
+- Job `deploy` adicionado ao `.github/workflows/ci.yml` (commit `05c693c`)
+- Script local `scripts/deploy.sh` criado (commit `41308f7`) para deploy manual e diagnóstico
+
+### O que falta — ação necessária (DIRETOR / responsável infra)
+
+**Criar o App Registration de deploy e adicionar o secret `AZURE_CREDENTIALS` no GitHub.**
+
+O `az ad sp create-for-rbac` falha localmente (bug az CLI + Python 3.14 no Fedora 43).
+Usar o **Portal do Azure** em vez do CLI:
+
+#### Passo 1 — Criar o App Registration
+
+1. [portal.azure.com](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **+ New registration**
+2. Name: `cepac-github-deploy` → **Register**
+3. Anote os valores exibidos:
+   - **Application (client) ID** ← guardar aqui: `_______________`
+   - **Directory (tenant) ID**: `f398df9c-fd0c-4829-a003-c770a1c4a063` (já conhecido)
+
+#### Passo 2 — Criar o Client Secret
+
+1. Ainda no app → **Certificates & secrets** → **New client secret**
+2. Description: `github-actions` · Expires: **24 months** → **Add**
+3. **Copiar o campo `Value` imediatamente** (desaparece ao sair da tela)
+
+#### Passo 3 — Atribuir role Contributor no Resource Group
+
+1. [portal.azure.com](https://portal.azure.com) → **Resource groups** → `rg_spurbanismo_cepac`
+2. **Access control (IAM)** → **+ Add** → **Add role assignment**
+3. Role: **Contributor** → Next → **+ Select members** → buscar `cepac-github-deploy` → **Review + assign**
+
+#### Passo 4 — Adicionar secret no GitHub
+
+Repositório → **Settings → Secrets and variables → Actions → New repository secret**
+
+Nome: `AZURE_CREDENTIALS`
+
+Valor (preencher com os dados dos passos anteriores):
+```json
+{
+  "clientId": "<Application (client) ID — Passo 1>",
+  "clientSecret": "<Value copiado — Passo 2>",
+  "subscriptionId": "506f92c4-471f-4f5f-8b5c-9ff96ad5ce8c",
+  "tenantId": "f398df9c-fd0c-4829-a003-c770a1c4a063"
+}
+```
+
+### Após configurar
+
+Todo push para `main` irá automaticamente:
+1. Rodar lint + testes + typecheck
+2. Construir as 3 imagens Docker e fazer push para o ACR
+3. **Atualizar os 3 Container Apps** com a nova imagem (job `deploy`)
+
+### Enquanto não configurado — deploy manual
+
+```bash
+# Ver o que está rodando vs o que existe no ACR
+./scripts/deploy.sh --status
+
+# Deployar a HEAD atual (após CI completar o build)
+./scripts/deploy.sh
+
+# Deployar uma tag específica
+./scripts/deploy.sh sha-9bb2900
+```
 
 ---
 

@@ -8,6 +8,7 @@
 #   build-api   — Docker build/push cepac-api
 #   build-portal — npm build cepac-portal → Docker build/push
 #   build-dash  — npm build cepac-dashboard → Docker build/push
+#   deploy      — az containerapp update (API + Portal + Dashboard) — main only
 #
 # Triggers:
 #   - push em qualquer branch
@@ -338,3 +339,45 @@ jobs:
           labels: ${{ steps.meta-dash.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Job 10 — Deploy para Azure Container Apps (somente em push para main)
+  # Requer GitHub Secret: AZURE_CREDENTIALS (Service Principal com role
+  # Contributor no resource group rg_spurbanismo_cepac).
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Azure Container Apps
+    runs-on: ubuntu-latest
+    needs: [build-api, build-portal, build-dashboard]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Deploy API
+        run: |
+          az containerapp update \
+            --name cepac-api \
+            --resource-group rg_spurbanismo_cepac \
+            --image cepacregistry.azurecr.io/cepac-api:sha-${{ steps.sha.outputs.short }}
+
+      - name: Deploy Portal
+        run: |
+          az containerapp update \
+            --name cepac-portal \
+            --resource-group rg_spurbanismo_cepac \
+            --image cepacregistry.azurecr.io/cepac-portal:sha-${{ steps.sha.outputs.short }}
+
+      - name: Deploy Dashboard
+        run: |
+          az containerapp update \
+            --name cepac-dashboard \
+            --resource-group rg_spurbanismo_cepac \
+            --image cepacregistry.azurecr.io/cepac-dashboard:sha-${{ steps.sha.outputs.short }}

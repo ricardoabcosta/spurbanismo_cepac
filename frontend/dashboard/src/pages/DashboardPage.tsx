@@ -9,7 +9,6 @@ import BigNumbers from "../components/BigNumbers";
 import GraficoEstoqueSetores from "../components/GraficoEstoqueSetores";
 import GraficoComposicaoACA from "../components/GraficoComposicaoACA";
 import GraficoComposicaoNuvem from "../components/GraficoComposicaoNuvem";
-import VelocimetroProzo from "../components/VelocimetroProzo";
 import MapaAlertas from "../components/MapaAlertas";
 import PainelCepac from "../components/PainelCepac";
 import GraficosAnaliticos from "../components/GraficosAnaliticos";
@@ -48,6 +47,7 @@ type Painel = "estoque" | "cepacs";
 
 const DashboardPage: React.FC = () => {
   const [painel, setPainel] = useState<Painel>("estoque");
+  const [modalTravasAberto, setModalTravasAberto] = useState(false);
   const { isDiretor, nome } = useUserRole();
   const { instance } = useMsal();
 
@@ -129,28 +129,142 @@ const DashboardPage: React.FC = () => {
       {/* Main content */}
       <main style={{ padding: "24px", maxWidth: 1440, margin: "0 auto" }}>
 
-        {/* Toggle de navegação entre painéis */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          {(["estoque", "cepacs"] as Painel[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPainel(p)}
+        {/* Toggle de navegação entre painéis + sino de travas */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(["estoque", "cepacs"] as Painel[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPainel(p)}
+                style={{
+                  padding: "7px 20px",
+                  borderRadius: 6,
+                  border: painel === p ? "none" : "1px solid #ccc",
+                  background: painel === p ? "#1a1a2e" : "#fff",
+                  color: painel === p ? "#fff" : "#555",
+                  fontWeight: painel === p ? 700 : 400,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all .15s",
+                }}
+              >
+                {p === "estoque" ? "Estoque de Área" : "CEPACs"}
+              </button>
+            ))}
+          </div>
+
+          {/* Sino de Travas Ativas */}
+          <button
+            onClick={() => setModalTravasAberto(true)}
+            title="Travas Ativas"
+            style={{
+              position: "relative",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 6,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 6,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.06)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={(data?.alertas.length ?? 0) > 0 ? "#c62828" : "#555"}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {(data?.alertas.length ?? 0) > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  right: 2,
+                  background: "#c62828",
+                  color: "#fff",
+                  borderRadius: "50%",
+                  fontSize: 10,
+                  minWidth: 16,
+                  height: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  padding: "0 3px",
+                }}
+              >
+                {data!.alertas.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Modal de Travas Ativas */}
+        {modalTravasAberto && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) setModalTravasAberto(false); }}
+          >
+            <div
               style={{
-                padding: "7px 20px",
-                borderRadius: 6,
-                border: painel === p ? "none" : "1px solid #ccc",
-                background: painel === p ? "#1a1a2e" : "#fff",
-                color: painel === p ? "#fff" : "#555",
-                fontWeight: painel === p ? 700 : 400,
-                fontSize: 13,
-                cursor: "pointer",
-                transition: "all .15s",
+                background: "#fff",
+                borderRadius: 8,
+                padding: "28px",
+                width: 480,
+                maxWidth: "90vw",
+                maxHeight: "80vh",
+                overflowY: "auto",
+                position: "relative",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
               }}
             >
-              {p === "estoque" ? "Estoque de Área" : "CEPACs"}
-            </button>
-          ))}
-        </div>
+              <button
+                onClick={() => setModalTravasAberto(false)}
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 14,
+                  background: "transparent",
+                  border: "none",
+                  fontSize: 22,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  color: "#888",
+                  fontWeight: 300,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "#333"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "#888"; }}
+              >
+                ×
+              </button>
+              {data ? (
+                <MapaAlertas alertas={data.alertas} />
+              ) : (
+                <p style={{ color: "#888", fontSize: 14, margin: 0 }}>Carregando dados…</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Painel CEPAC + Análises */}
         {painel === "cepacs" && (
@@ -217,15 +331,6 @@ const DashboardPage: React.FC = () => {
                 {/* Composição NUVEM por setor */}
                 <GraficoComposicaoNuvem setores={data.setores} />
 
-                {/* Velocímetro + Alertas lado a lado */}
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
-                  <VelocimetroProzo
-                    percentual={data.prazo_percentual_decorrido}
-                    diasRestantes={data.prazo_dias_restantes}
-                    zona={data.prazo_zona}
-                  />
-                  <MapaAlertas alertas={data.alertas} />
-                </div>
               </>
             )}
           </>

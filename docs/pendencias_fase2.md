@@ -1,7 +1,7 @@
 # Pendências Fase 2 — CEPAC SP Urbanismo
 
 > Documento de controle das atividades que restam para finalizar a Fase 2 em produção.
-> Atualizado em: 01/05/2026 (CI totalmente verde — testes + mypy + builds)
+> Atualizado em: 02/05/2026 (fixes portal auth + nginx cache + deploy)
 
 ---
 
@@ -18,7 +18,8 @@
 | DEV_BYPASS desativado | ✅ Container App + código frontend | 01/05/2026 |
 | CI/CD — builds e deploy | ✅ Pipeline totalmente verde (commit 07167b5) | 01/05/2026 |
 | Testes de integração | ✅ 35/35 passando local e no CI (commit b32535b) | 01/05/2026 |
-| Primeiro login real | ⏳ Pendente | — |
+| Bugs do portal (auth + cache) | ✅ Corrigidos e em produção (commit 9e8de63) | 02/05/2026 |
+| Primeiro login real | ⏳ Em validação | 02/05/2026 |
 | Blob Storage funcional | ⏳ Pendente | — |
 
 ---
@@ -127,6 +128,14 @@ VITE_AZURE_TENANT_ID=f398df9c-fd0c-4829-a003-c770a1c4a063
 - `cepacregistry.azurecr.io/cepac-portal:sha-4d7d481` — MSAL real, VITE_DEV_BYPASS_AUTH=false
 - `cepacregistry.azurecr.io/cepac-dashboard:sha-4d7d481` — MSAL real, VITE_DEV_BYPASS_AUTH=false
 
+### Estado atual das imagens (02/05/2026)
+
+- `cepacregistry.azurecr.io/cepac-api:sha-3aef710` — logs DEBUG ativos (sem mudança funcional)
+- `cepacregistry.azurecr.io/cepac-portal:sha-9e8de63` — interceptor Axios corrigido + nginx no-store
+- `cepacregistry.azurecr.io/cepac-dashboard:sha-9e8de63` — nginx no-store
+
+Revisões ativas: `cepac-portal--0000019`, `cepac-dashboard--0000013`
+
 ### Verificar deploy
 
 ```bash
@@ -165,9 +174,59 @@ az containerapp logs show --name cepac-portal --resource-group rg_spurbanismo_ce
 
 ---
 
-## Bloco 4 — Primeiro login real ⏳ PENDENTE
+## Bloco 3c — Bugs do portal no primeiro deploy real ✅ CONCLUÍDO
 
-Pré-requisito: Bloco 3 concluído ✅
+**Concluído em:** 02/05/2026
+
+Bugs encontrados e corrigidos após a ativação do Azure AD real (DEV_BYPASS_AUTH=false).
+
+### Fixes aplicados
+
+| Fix | Arquivo(s) | Commit | Autor |
+|---|---|---|---|
+| favicon.svg ausente em `public/` → 404 | `frontend/portal/public/favicon.svg`, `frontend/dashboard/public/favicon.svg` | `231e994` | Claude |
+| `dashboard/index.html` referenciava `/vite.svg` inexistente | `frontend/dashboard/index.html` | `231e994` | Claude |
+| Interceptor Axios enviava requisição sem token quando `acquireTokenSilent` levantava exceção | `frontend/portal/src/api/client.ts`, `frontend/dashboard/src/api/client.ts` | `e151bed` | Ricardo |
+| `navigateToLoginRequestUrl` ausente — MSAL não retornava à rota original após login | `frontend/portal/src/authConfig.ts` | `e8ea951` | Ricardo |
+| `ProtectedRoute` renderizava children antes de `isAuthenticated` ser confirmado | `frontend/portal/src/components/ProtectedRoute.tsx` | `03a5180` | Ricardo |
+| Interceptor Axios retornava `config` sem `Authorization` quando `accounts.length === 0` → API recebia requisição sem token → 401 | `frontend/portal/src/api/client.ts` | `ff5e043` | Claude |
+| `index.html` sem `Cache-Control: no-store` → browser usava bundle antigo cacheado com `immutable` após novo deploy | `infra/nginx-spa.conf`, `infra/nginx-spa-dashboard.conf` | `9e8de63` | Claude |
+
+### Raiz dos bugs
+
+| Problema | Causa raiz |
+|---|---|
+| Portal 401 após login | `client.ts` retornava requisição sem Bearer quando `getAllAccounts()` vazia — enviava request ao invés de redirecionar para login |
+| Browser rodando bundle antigo após deploy | nginx não setava `Cache-Control: no-store` no `index.html`; browser aplicava heuristic caching e servia HTML velho que apontava para bundle cacheado com `immutable` |
+
+### Padrão correto do interceptor Axios (portal = dashboard)
+
+```typescript
+if (accounts.length === 0) {
+  await msalInstance.loginRedirect(loginRequest);
+  return new Promise(() => undefined); // nunca resolve — browser já navegou
+}
+try {
+  const token = await msalInstance.acquireTokenSilent({...});
+  config.headers.Authorization = `Bearer ${token.accessToken}`;
+  return config;
+} catch (error) {
+  if (error instanceof InteractionRequiredAuthError) {
+    await msalInstance.loginRedirect(loginRequest);
+  }
+  return new Promise(() => undefined);
+}
+```
+
+---
+
+## Bloco 4 — Primeiro login real ⏳ EM VALIDAÇÃO
+
+Pré-requisito: Bloco 3c concluído ✅
+
+> **Importante:** ao testar após um novo deploy, abrir o portal em **janela anônima/privativa**
+> para garantir sessionStorage e cache zerados. Com o fix do nginx (Bloco 3c), `index.html` passa
+> a ser `no-store` e o browser sempre buscará o bundle correto em deploys futuros.
 
 ### 4.1 — Acessar o Portal
 

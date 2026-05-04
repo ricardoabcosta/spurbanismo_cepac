@@ -67,6 +67,10 @@ MIGRATION_ORDER = [
     "012_proposta_campos_planilha.sql",
     "013_certidao_expand.sql",
     "014_limpa_certidoes_formato_invalido.sql",
+    "015_operacao_urbana.sql",
+    "016_fk_setor_operacao_urbana.sql",
+    "017_setor_hierarquia_fatores.sql",
+    "018_seed_fatores_equivalencia_oucae.sql",
 ]
 
 

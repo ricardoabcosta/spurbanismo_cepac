@@ -11,12 +11,13 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Boolean, Integer, Numeric, String, text
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
+    from .operacao_urbana import OperacaoUrbana
     from .titulo_cepac import TituloCepac
     from .movimentacao import Movimentacao
     from .solicitacao_vinculacao import SolicitacaoVinculacao
@@ -62,6 +63,33 @@ class Setor(Base):
     cepacs_convertidos_parametros: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cepacs_desvinculados_aca: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cepacs_desvinculados_parametros: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # --- Operação Urbana ---
+    operacao_urbana_id: Mapped[int] = mapped_column(
+        ForeignKey("operacao_urbana.id"), nullable=False
+    )
+    operacao_urbana: Mapped["OperacaoUrbana"] = relationship(
+        "OperacaoUrbana", back_populates="setores", lazy="select"
+    )
+
+    # --- Hierarquia de subsetores ---
+    setor_pai_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("setor.id"), nullable=True
+    )
+    pai: Mapped["Setor | None"] = relationship(
+        "Setor", back_populates="subsetores", remote_side="Setor.id", lazy="select"
+    )
+    subsetores: Mapped[list["Setor"]] = relationship(
+        "Setor", back_populates="pai", lazy="select"
+    )
+
+    # --- Fatores de Equivalência ---
+    fator_equivalencia_f1: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 6), nullable=True
+    )
+    fator_equivalencia_f2: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 6), nullable=True
+    )
 
     # --- Controle ---
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

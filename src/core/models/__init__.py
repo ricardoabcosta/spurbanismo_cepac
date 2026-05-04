@@ -37,6 +37,9 @@ from .solicitacao_titulos import SolicitacaoTitulos
 from .solicitacao_vinculacao import SolicitacaoVinculacao
 from .titulo_cepac import TituloCepac
 
+# Modelo — Operacao Urbana
+from .operacao_urbana import OperacaoUrbana
+
 # Config global
 from .configuracao_operacao import ConfiguracaoOperacao
 
@@ -69,6 +72,8 @@ __all__ = [
     "SolicitacaoVinculacao",
     "SolicitacaoTitulos",
     "Movimentacao",
+    # Modelo independente
+    "OperacaoUrbana",
     # Modelos — Fase 2 (ordem topológica das dependências)
     "Usuario",
     "Proposta",

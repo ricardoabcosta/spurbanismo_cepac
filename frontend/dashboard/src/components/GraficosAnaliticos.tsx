@@ -119,17 +119,22 @@ function DonutLabel({ cx, cy, taxa }: { cx: number; cy: number; taxa: number }) 
 // Componente principal
 // ---------------------------------------------------------------------------
 
-const GraficosAnaliticos: React.FC = () => {
+interface GraficosAnaliticosProps {
+  oucId?: number;
+}
+
+const GraficosAnaliticos: React.FC<GraficosAnaliticosProps> = ({ oucId }) => {
   const [dados, setDados] = useState<GraficosOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchGraficos()
+    setLoading(true);
+    fetchGraficos(oucId)
       .then(setDados)
       .catch(() => setErro("Não foi possível carregar os dados analíticos."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [oucId]);
 
   if (loading) {
     return (

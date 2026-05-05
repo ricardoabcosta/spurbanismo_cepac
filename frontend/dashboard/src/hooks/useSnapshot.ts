@@ -3,6 +3,7 @@
  *
  * - Sem data histórica: polling a cada 60s com setInterval
  * - Com data histórica: fetch único, sem polling
+ * - oucId null → aguarda seleção (não busca dados)
  * - Limpa o intervalo no cleanup (sem memory leak)
  * - Retorna { data, loading, error }
  */
@@ -18,15 +19,16 @@ interface UseSnapshotResult {
   error: string | null;
 }
 
-export function useSnapshot(dataHistorica?: string): UseSnapshotResult {
+export function useSnapshot(dataHistorica?: string, oucId?: number | null): UseSnapshotResult {
   const [data, setData] = useState<DashboardSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (oucId === null) return; // aguarda seleção de OUC
     try {
       setError(null);
-      const snapshot = await fetchSnapshot(dataHistorica);
+      const snapshot = await fetchSnapshot(dataHistorica, oucId ?? undefined);
       if (snapshot && Array.isArray(snapshot.setores)) {
         setData(snapshot);
       } else {
@@ -38,9 +40,14 @@ export function useSnapshot(dataHistorica?: string): UseSnapshotResult {
     } finally {
       setLoading(false);
     }
-  }, [dataHistorica]);
+  }, [dataHistorica, oucId]);
 
   useEffect(() => {
+    if (oucId === null) {
+      setLoading(false);
+      setData(null);
+      return;
+    }
     setLoading(true);
     void load();
 
@@ -57,7 +64,7 @@ export function useSnapshot(dataHistorica?: string): UseSnapshotResult {
     return () => {
       clearInterval(intervalId);
     };
-  }, [load, dataHistorica]);
+  }, [load, dataHistorica, oucId]);
 
   return { data, loading, error };
 }

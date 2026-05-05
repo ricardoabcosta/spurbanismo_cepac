@@ -69,3 +69,10 @@ export interface CepacSnapshot {
   cepacs_colocacao_privada: number;
   setores: CepacSetor[];
 }
+
+export interface OperacaoUrbanaResumo {
+  id: number;
+  sigla: string;
+  nome: string;
+  ativo: boolean;
+}

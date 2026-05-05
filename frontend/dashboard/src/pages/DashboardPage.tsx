@@ -2,9 +2,10 @@
  * DashboardPage — página principal que monta todos os componentes.
  * Lê role do token MSAL para determinar se é DIRETOR.
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useMsal } from "@azure/msal-react";
 import { useSnapshot } from "../hooks/useSnapshot";
+import { fetchOperacoesUrbanas } from "../api/dashboard";
 import BigNumbers from "../components/BigNumbers";
 import GraficoEstoqueSetores from "../components/GraficoEstoqueSetores";
 import GraficoComposicaoACA from "../components/GraficoComposicaoACA";
@@ -12,12 +13,10 @@ import GraficoComposicaoNuvem from "../components/GraficoComposicaoNuvem";
 import MapaAlertas from "../components/MapaAlertas";
 import PainelCepac from "../components/PainelCepac";
 import GraficosAnaliticos from "../components/GraficosAnaliticos";
+import type { OperacaoUrbanaResumo } from "../types/api";
 
-/**
- * Extrai o papel do usuário a partir das claims do token MSAL.
- * A claim "roles" vem do App Role definido no Azure AD.
- */
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+const OUC_STORAGE_KEY = "cepac_ouc_dashboard";
 
 function useUserRole(): { isDiretor: boolean; nome: string } {
   const { accounts } = useMsal();
@@ -51,7 +50,30 @@ const DashboardPage: React.FC = () => {
   const { isDiretor, nome } = useUserRole();
   const { instance } = useMsal();
 
-  const { data, loading, error } = useSnapshot();
+  // Operações Urbanas disponíveis
+  const [oucs, setOucs] = useState<OperacaoUrbanaResumo[]>([]);
+  // null = ainda não inicializado (aguardando lista de OUCs)
+  const [selectedOucId, setSelectedOucId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchOperacoesUrbanas()
+      .then((lista) => {
+        setOucs(lista);
+        // Restaura a última OUC salva, ou usa a primeira da lista
+        const saved = localStorage.getItem(OUC_STORAGE_KEY);
+        const savedId = saved ? parseInt(saved, 10) : NaN;
+        const valid = lista.find((o) => o.id === savedId);
+        setSelectedOucId(valid ? valid.id : (lista[0]?.id ?? null));
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleOucChange = (id: number) => {
+    setSelectedOucId(id);
+    localStorage.setItem(OUC_STORAGE_KEY, String(id));
+  };
+
+  const { data, loading, error } = useSnapshot(undefined, selectedOucId);
 
   const handleLogout = () => {
     instance.logoutRedirect().catch(console.error);
@@ -101,6 +123,51 @@ const DashboardPage: React.FC = () => {
             </span>
           )}
         </div>
+
+        {/* Centro: Seletor de OUC */}
+        {oucs.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontWeight: 600, whiteSpace: "nowrap" }}>
+              Operação Urbana:
+            </span>
+            <div style={{ display: "flex", gap: 6 }}>
+              {oucs.map((ouc) => (
+                <button
+                  key={ouc.id}
+                  onClick={() => handleOucChange(ouc.id)}
+                  title={ouc.nome}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    border: selectedOucId === ouc.id
+                      ? "2px solid rgba(255,255,255,0.9)"
+                      : "1px solid rgba(255,255,255,0.3)",
+                    background: selectedOucId === ouc.id
+                      ? "rgba(255,255,255,0.18)"
+                      : "transparent",
+                    color: "#fff",
+                    fontWeight: selectedOucId === ouc.id ? 700 : 400,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    transition: "all .15s",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedOucId !== ouc.id)
+                      e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedOucId !== ouc.id)
+                      e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  {ouc.sigla}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {nome && (
             <span style={{ fontSize: 15, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{nome}</span>
@@ -269,16 +336,30 @@ const DashboardPage: React.FC = () => {
         {/* Painel CEPAC + Análises */}
         {painel === "cepacs" && (
           <>
-            <PainelCepac />
-            <GraficosAnaliticos />
+            <PainelCepac oucId={selectedOucId ?? undefined} />
+            <GraficosAnaliticos oucId={selectedOucId ?? undefined} />
           </>
         )}
 
         {/* Painel Estoque de Área */}
         {painel === "estoque" && (
           <>
+            {/* Aguardando seleção de OUC */}
+            {selectedOucId === null && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  padding: "48px 0",
+                  color: "#666",
+                }}
+              >
+                <p>Carregando lista de Operações Urbanas…</p>
+              </div>
+            )}
+
             {/* Estado de carregamento */}
-            {loading && (
+            {selectedOucId !== null && loading && (
               <div
                 style={{
                   display: "flex",

@@ -131,18 +131,22 @@ function TabelaCepac({ titulo, cor, setores, getAca, getParametros }: TabelaCepa
 // PainelCepac
 // ---------------------------------------------------------------------------
 
-const PainelCepac: React.FC = () => {
+interface PainelCepacProps {
+  oucId?: number;
+}
+
+const PainelCepac: React.FC<PainelCepacProps> = ({ oucId }) => {
   const [data, setData] = useState<CepacSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     setLoading(true);
-    fetchCepacSnapshot()
+    fetchCepacSnapshot(oucId)
       .then(setData)
       .catch(() => setError("Erro ao carregar dados de CEPACs."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [oucId]);
 
   if (loading) {
     return (

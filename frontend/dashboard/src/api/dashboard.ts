@@ -2,14 +2,16 @@
  * Funções tipadas para os endpoints do Dashboard Executivo.
  */
 import apiClient from "./client";
-import type { AlertaSetorial, CepacSnapshot, DashboardSnapshot, MedicaoObra } from "../types/api";
+import type { AlertaSetorial, CepacSnapshot, DashboardSnapshot, MedicaoObra, OperacaoUrbanaResumo } from "../types/api";
 
 /**
  * GET /dashboard/snapshot
  * Com `data` faz snapshot histórico (DIRETOR apenas).
  */
-export async function fetchSnapshot(data?: string): Promise<DashboardSnapshot> {
-  const params = data ? { data } : {};
+export async function fetchSnapshot(data?: string, oucId?: number): Promise<DashboardSnapshot> {
+  const params: Record<string, unknown> = {};
+  if (data) params.data = data;
+  if (oucId !== undefined) params.operacao_urbana_id = oucId;
   const response = await apiClient.get<DashboardSnapshot>("/dashboard/snapshot", { params });
   return response.data;
 }
@@ -17,8 +19,9 @@ export async function fetchSnapshot(data?: string): Promise<DashboardSnapshot> {
 /**
  * GET /dashboard/alertas
  */
-export async function fetchAlertas(): Promise<AlertaSetorial[]> {
-  const response = await apiClient.get<AlertaSetorial[]>("/dashboard/alertas");
+export async function fetchAlertas(oucId?: number): Promise<AlertaSetorial[]> {
+  const params = oucId !== undefined ? { operacao_urbana_id: oucId } : {};
+  const response = await apiClient.get<AlertaSetorial[]>("/dashboard/alertas", { params });
   return response.data;
 }
 
@@ -33,8 +36,19 @@ export async function fetchMedicoes(): Promise<MedicaoObra[]> {
 /**
  * GET /dashboard/cepac
  */
-export async function fetchCepacSnapshot(): Promise<CepacSnapshot> {
-  const response = await apiClient.get<CepacSnapshot>("/dashboard/cepac");
+export async function fetchCepacSnapshot(oucId?: number): Promise<CepacSnapshot> {
+  const params = oucId !== undefined ? { operacao_urbana_id: oucId } : {};
+  const response = await apiClient.get<CepacSnapshot>("/dashboard/cepac", { params });
+  return response.data;
+}
+
+/**
+ * GET /admin/operacoes-urbanas?ativo=true  — lista OUCs ativas para o seletor
+ */
+export async function fetchOperacoesUrbanas(): Promise<OperacaoUrbanaResumo[]> {
+  const response = await apiClient.get<OperacaoUrbanaResumo[]>("/admin/operacoes-urbanas", {
+    params: { ativo: true },
+  });
   return response.data;
 }
 
@@ -79,7 +93,8 @@ export interface GraficosOut {
   g7_correlacao: number;
 }
 
-export async function fetchGraficos(): Promise<GraficosOut> {
-  const response = await apiClient.get<GraficosOut>("/dashboard/graficos");
+export async function fetchGraficos(oucId?: number): Promise<GraficosOut> {
+  const params = oucId !== undefined ? { operacao_urbana_id: oucId } : {};
+  const response = await apiClient.get<GraficosOut>("/dashboard/graficos", { params });
   return response.data;
 }

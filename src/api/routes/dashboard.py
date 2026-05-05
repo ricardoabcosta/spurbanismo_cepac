@@ -29,6 +29,7 @@ from src.api.schemas.dashboard import (
     OcupacaoSetorOut,
 )
 from src.core.models.configuracao_operacao import ConfiguracaoOperacao
+from src.core.models.operacao_urbana import OperacaoUrbana
 from src.core.models.setor import Setor
 from src.core.repositories import dashboard_repository
 
@@ -56,6 +57,10 @@ async def snapshot(
         Optional[date],
         Query(description="Data de referência para snapshot histórico (DIRETOR apenas)"),
     ] = None,
+    operacao_urbana_id: Annotated[
+        Optional[int],
+        Query(description="Filtra setores por Operação Urbana"),
+    ] = None,
 ) -> DashboardSnapshotOut:
     """
     Snapshot point-in-time quando `data` é informado.
@@ -69,7 +74,7 @@ async def snapshot(
             detail="Snapshot histórico restrito a DIRETOR.",
         )
 
-    dados = await dashboard_repository.montar_snapshot(session, data)
+    dados = await dashboard_repository.montar_snapshot(session, data, operacao_urbana_id)
     return DashboardSnapshotOut(
         gerado_em=dados["gerado_em"],
         custo_total_incorrido=dados["custo_total_incorrido"],
@@ -121,9 +126,10 @@ async def snapshot(
 async def setores(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    operacao_urbana_id: Annotated[Optional[int], Query(description="Filtra por OUC")] = None,
 ) -> list[OcupacaoSetorOut]:
     """Retorna a ocupação atual de cada setor."""
-    setores_orm = await dashboard_repository.buscar_setores(session)
+    setores_orm = await dashboard_repository.buscar_setores(session, operacao_urbana_id)
     dtos = await dashboard_repository.calcular_ocupacao_setores(session, setores=setores_orm)
     return [
         OcupacaoSetorOut(
@@ -160,12 +166,13 @@ async def setores(
 async def alertas(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    operacao_urbana_id: Annotated[Optional[int], Query(description="Filtra por OUC")] = None,
 ) -> list[AlertaSetorialOut]:
     """
     Retorna os alertas de travas ativos (TETO_NR_EXCEDIDO, RESERVA_R_VIOLADA).
     Lista vazia quando não há travas ativas.
     """
-    setores_orm = await dashboard_repository.buscar_setores(session)
+    setores_orm = await dashboard_repository.buscar_setores(session, operacao_urbana_id)
     ocupacao = await dashboard_repository.calcular_ocupacao_setores(session, setores=setores_orm)
     dtos = dashboard_repository.calcular_alertas(ocupacao, setores_orm)
     return [
@@ -209,22 +216,39 @@ async def medicoes(
 async def cepac_snapshot(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    operacao_urbana_id: Annotated[Optional[int], Query(description="Filtra por OUC")] = None,
 ) -> CepacSnapshotOut:
     """Retorna totais globais de CEPACs e os parâmetros de conversão/desvinculação por setor."""
-    cfg_result = await session.execute(
-        select(ConfiguracaoOperacao).where(ConfiguracaoOperacao.id == 1)
-    )
-    cfg = cfg_result.scalar_one_or_none()
+    if operacao_urbana_id is not None:
+        ouc_result = await session.execute(
+            select(OperacaoUrbana).where(OperacaoUrbana.id == operacao_urbana_id)
+        )
+        ouc = ouc_result.scalar_one_or_none()
+        cepacs_totais = ouc.cepacs_totais if ouc else 0
+        cepacs_leiloados = ouc.cepacs_leiloados if ouc else 0
+        cepacs_colocacao_privada = ouc.cepacs_colocacao_privada if ouc else 0
+        setores_result = await session.execute(
+            select(Setor)
+            .where(Setor.ativo, Setor.operacao_urbana_id == operacao_urbana_id)
+            .order_by(Setor.nome)
+        )
+    else:
+        cfg_result = await session.execute(
+            select(ConfiguracaoOperacao).where(ConfiguracaoOperacao.id == 1)
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        cepacs_totais = cfg.cepacs_totais if cfg else 0
+        cepacs_leiloados = cfg.cepacs_leiloados if cfg else 0
+        cepacs_colocacao_privada = cfg.cepacs_colocacao_privada if cfg else 0
+        setores_result = await session.execute(
+            select(Setor).where(Setor.ativo).order_by(Setor.nome)
+        )
 
-    setores_result = await session.execute(
-        select(Setor).where(Setor.ativo).order_by(Setor.nome)
-    )
     setores = setores_result.scalars().all()
-
     return CepacSnapshotOut(
-        cepacs_totais=cfg.cepacs_totais if cfg else 0,
-        cepacs_leiloados=cfg.cepacs_leiloados if cfg else 0,
-        cepacs_colocacao_privada=cfg.cepacs_colocacao_privada if cfg else 0,
+        cepacs_totais=cepacs_totais,
+        cepacs_leiloados=cepacs_leiloados,
+        cepacs_colocacao_privada=cepacs_colocacao_privada,
         setores=[CepacSetorOut.model_validate(s) for s in setores],
     )
 
@@ -242,11 +266,12 @@ async def cepac_snapshot(
 async def graficos(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    operacao_urbana_id: Annotated[Optional[int], Query(description="Filtra por OUC")] = None,
 ) -> GraficosOut:
     """
     Retorna um único objeto com os dados consolidados para todos os gráficos analíticos:
     evolução temporal, ACA vs Parâmetros, status de propostas, distribuição por uso,
     top 10 setores, histograma de tempo de análise e scatter área x CEPACs.
     """
-    dados = await dashboard_repository.montar_graficos(session)
+    dados = await dashboard_repository.montar_graficos(session, operacao_urbana_id)
     return GraficosOut(**dados)

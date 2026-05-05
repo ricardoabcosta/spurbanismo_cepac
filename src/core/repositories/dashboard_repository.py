@@ -75,9 +75,15 @@ _DIAS_TOTAIS = (_DATA_FIM_OUCAE - _DATA_INICIO_OUCAE).days  # 9 496 dias
 # Setores
 # ---------------------------------------------------------------------------
 
-async def buscar_setores(session: AsyncSession) -> list[Setor]:
-    """Retorna todos os setores ordenados por nome."""
-    result = await session.execute(select(Setor).order_by(Setor.nome))
+async def buscar_setores(
+    session: AsyncSession,
+    operacao_urbana_id: Optional[int] = None,
+) -> list[Setor]:
+    """Retorna setores ordenados por nome, filtrados por OUC quando informado."""
+    stmt = select(Setor).order_by(Setor.nome)
+    if operacao_urbana_id is not None:
+        stmt = stmt.where(Setor.operacao_urbana_id == operacao_urbana_id)
+    result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
@@ -321,13 +327,31 @@ async def listar_medicoes(session: AsyncSession) -> list[MedicaoObra]:
 # Snapshot completo (entry point usado pela rota)
 # ---------------------------------------------------------------------------
 
-async def montar_graficos(session: AsyncSession) -> dict:
+async def montar_graficos(
+    session: AsyncSession,
+    operacao_urbana_id: Optional[int] = None,
+) -> dict:
     """
     Monta os dados para os 7 gráficos analíticos do dashboard.
 
     Todas as queries usam sqlalchemy.text() para máxima performance.
+    `operacao_urbana_id` filtra propostas/setores pela OUC.
     Retorna um dict compatível com GraficosOut.
     """
+    # Fragmentos SQL condicionais para filtro por OUC
+    _bind: dict = {}
+    _j = ""       # JOIN setor para queries que não têm JOIN
+    _ouc_pre = "" # prefixo em WHERE existente: WHERE {_ouc_pre}condicao...
+    _ouc_and = "" # sufixo em WHERE existente: WHERE condicao {_ouc_and}
+    _ouc_w = ""   # WHERE completo para queries sem WHERE: {_ouc_w}GROUP BY...
+    _sf = ""      # filtro adicional na tabela setor: WHERE ativo = true {_sf}
+    if operacao_urbana_id is not None:
+        _bind = {"ouc_id": operacao_urbana_id}
+        _j = "JOIN setor s ON s.id = proposta.setor_id "
+        _ouc_pre = "s.operacao_urbana_id = :ouc_id AND "
+        _ouc_and = "AND s.operacao_urbana_id = :ouc_id "
+        _ouc_w = "WHERE s.operacao_urbana_id = :ouc_id "
+        _sf = "AND operacao_urbana_id = :ouc_id "
 
     def _pearson(xs: list[float], ys: list[float]) -> float:
         n = len(xs)
@@ -350,10 +374,10 @@ async def montar_graficos(session: AsyncSession) -> dict:
     # ------------------------------------------------------------------ G1
     g1_rows = (await session.execute(text(
         "SELECT EXTRACT(YEAR FROM data_certidao)::int AS ano, SUM(cepac_total)::int AS total "
-        "FROM proposta "
-        "WHERE data_certidao IS NOT NULL AND cepac_total IS NOT NULL AND cepac_total > 0 "
+        f"FROM proposta {_j}"
+        f"WHERE {_ouc_pre}data_certidao IS NOT NULL AND cepac_total IS NOT NULL AND cepac_total > 0 "
         "GROUP BY ano ORDER BY ano"
-    ))).fetchall()
+    ), _bind)).fetchall()
 
     g1_evolucao = [{"ano": r.ano, "total": r.total} for r in g1_rows]
     g1_total_cepacs = sum(r["total"] for r in g1_evolucao)
@@ -372,8 +396,9 @@ async def montar_graficos(session: AsyncSession) -> dict:
         "       COALESCE(SUM(p.cepac_aca), 0)::int AS cepac_aca, "
         "       COALESCE(SUM(p.cepac_parametros), 0)::int AS cepac_parametros "
         "FROM proposta p JOIN setor s ON s.id = p.setor_id "
+        f"{_ouc_w}"
         "GROUP BY s.nome ORDER BY s.nome"
-    ))).fetchall()
+    ), _bind)).fetchall()
 
     g2_por_setor = [{"setor": r.setor, "cepac_aca": r.cepac_aca, "cepac_parametros": r.cepac_parametros} for r in g2_rows]
     g2_total_aca = sum(r["cepac_aca"] for r in g2_por_setor)
@@ -385,8 +410,10 @@ async def montar_graficos(session: AsyncSession) -> dict:
 
     # ------------------------------------------------------------------ G3
     g3_status_rows = (await session.execute(text(
-        "SELECT status_pa, COUNT(*)::int AS total FROM proposta GROUP BY status_pa"
-    ))).fetchall()
+        f"SELECT status_pa, COUNT(*)::int AS total FROM proposta {_j}"
+        f"{_ouc_w}"
+        "GROUP BY status_pa"
+    ), _bind)).fetchall()
 
     g3_deferidas = 0
     g3_indeferidas = 0
@@ -404,11 +431,11 @@ async def montar_graficos(session: AsyncSession) -> dict:
         "SELECT TO_CHAR(data_autuacao, 'YYYY-MM') AS mes, "
         "       SUM(CASE WHEN status_pa = 'DEFERIDO' THEN 1 ELSE 0 END)::int AS deferidas, "
         "       SUM(CASE WHEN status_pa = 'INDEFERIDO' THEN 1 ELSE 0 END)::int AS indeferidas "
-        "FROM proposta "
-        "WHERE data_autuacao IS NOT NULL "
+        f"FROM proposta {_j}"
+        f"WHERE {_ouc_pre}data_autuacao IS NOT NULL "
         "  AND data_autuacao >= (CURRENT_DATE - INTERVAL '12 months') "
         "GROUP BY mes ORDER BY mes"
-    ))).fetchall()
+    ), _bind)).fetchall()
 
     g3_por_mes = [
         {
@@ -422,10 +449,10 @@ async def montar_graficos(session: AsyncSession) -> dict:
     # ------------------------------------------------------------------ G4
     g4_rows = (await session.execute(text(
         "SELECT uso_aca, COALESCE(SUM(cepac_total), 0)::int AS total "
-        "FROM proposta "
-        "WHERE uso_aca IS NOT NULL AND cepac_total IS NOT NULL "
+        f"FROM proposta {_j}"
+        f"WHERE {_ouc_pre}uso_aca IS NOT NULL AND cepac_total IS NOT NULL "
         "GROUP BY uso_aca ORDER BY total DESC"
-    ))).fetchall()
+    ), _bind)).fetchall()
 
     g4_uso = [{"uso": r.uso_aca, "total": r.total} for r in g4_rows]
     g4_mais_comum = g4_uso[0]["uso"] if g4_uso else ""
@@ -435,24 +462,24 @@ async def montar_graficos(session: AsyncSession) -> dict:
     g5_rows = (await session.execute(text(
         "SELECT s.nome AS setor, COALESCE(SUM(p.cepac_total), 0)::int AS total "
         "FROM proposta p JOIN setor s ON s.id = p.setor_id "
-        "WHERE p.cepac_total IS NOT NULL "
+        f"WHERE p.cepac_total IS NOT NULL {_ouc_and}"
         "GROUP BY s.nome ORDER BY total DESC LIMIT 10"
-    ))).fetchall()
+    ), _bind)).fetchall()
 
     g5_top_setores = [{"setor": r.setor, "total": r.total} for r in g5_rows]
     g5_setor_lider = g5_top_setores[0]["setor"] if g5_top_setores else ""
     g5_total_top10 = sum(r["total"] for r in g5_top_setores)
 
     g5_ativos_row = (await session.execute(text(
-        "SELECT COUNT(*)::int AS total FROM setor WHERE ativo = true"
-    ))).fetchone()
+        f"SELECT COUNT(*)::int AS total FROM setor WHERE ativo = true {_sf}"
+    ), _bind)).fetchone()
     g5_setores_ativos = g5_ativos_row.total if g5_ativos_row else 0
 
     # ------------------------------------------------------------------ G6
     _g6_subquery = (
         "SELECT (data_certidao - data_autuacao) AS dias "
-        "FROM proposta "
-        "WHERE data_certidao IS NOT NULL AND data_autuacao IS NOT NULL "
+        f"FROM proposta {_j}"
+        f"WHERE {_ouc_pre}data_certidao IS NOT NULL AND data_autuacao IS NOT NULL "
         "  AND data_certidao >= data_autuacao"
     )
     g6_hist_rows = (await session.execute(text(
@@ -473,14 +500,14 @@ async def montar_graficos(session: AsyncSession) -> dict:
         "  COUNT(*)::int AS quantidade "
         f"FROM ({_g6_subquery}) t "
         "GROUP BY faixa, ordem ORDER BY ordem"
-    ))).fetchall()
+    ), _bind)).fetchall()
 
     g6_histograma = [{"faixa": r.faixa, "quantidade": r.quantidade} for r in g6_hist_rows]
 
     g6_stats_row = (await session.execute(text(
         f"SELECT AVG(dias)::float AS media, MIN(dias)::float AS minimo, MAX(dias)::float AS maximo "
         f"FROM ({_g6_subquery}) t"
-    ))).fetchone()
+    ), _bind)).fetchone()
 
     g6_tempo_medio = round(g6_stats_row.media, 1) if g6_stats_row and g6_stats_row.media is not None else 0.0
     g6_tempo_minimo = g6_stats_row.minimo if g6_stats_row and g6_stats_row.minimo is not None else 0.0
@@ -489,11 +516,11 @@ async def montar_graficos(session: AsyncSession) -> dict:
     # ------------------------------------------------------------------ G7
     g7_rows = (await session.execute(text(
         "SELECT aca_total_m2::float AS area_m2, cepac_total "
-        "FROM proposta "
-        "WHERE aca_total_m2 IS NOT NULL AND cepac_total IS NOT NULL "
+        f"FROM proposta {_j}"
+        f"WHERE {_ouc_pre}aca_total_m2 IS NOT NULL AND cepac_total IS NOT NULL "
         "  AND aca_total_m2 > 0 AND cepac_total > 0 "
         "ORDER BY aca_total_m2"
-    ))).fetchall()
+    ), _bind)).fetchall()
 
     g7_scatter = [{"area_m2": r.area_m2, "cepac_total": r.cepac_total} for r in g7_rows]
     if g7_scatter:
@@ -543,26 +570,36 @@ async def montar_graficos(session: AsyncSession) -> dict:
 async def montar_snapshot(
     session: AsyncSession,
     data_referencia: Optional[date] = None,
+    operacao_urbana_id: Optional[int] = None,
 ) -> dict:
     """
     Monta todos os indicadores do dashboard em um único dicionário.
 
     `data_referencia` ativa o modo histórico point-in-time.
+    `operacao_urbana_id` filtra setores por OUC.
     """
-    # Converter para datetime com fim-de-dia UTC para queries de movimentação
+    from src.core.models.operacao_urbana import OperacaoUrbana  # local import para evitar ciclo
+
     data_limite: Optional[datetime] = None
     if data_referencia is not None:
-        data_limite = datetime.combine(data_referencia, time.max)  # naive — TIMESTAMP WITHOUT TIME ZONE
+        data_limite = datetime.combine(data_referencia, time.max)
 
-    setores = await buscar_setores(session)
+    setores = await buscar_setores(session, operacao_urbana_id)
     setores_ocupacao = await calcular_ocupacao_setores(session, data_limite, setores)
     alertas = calcular_alertas(setores_ocupacao, setores)
 
-    cfg_result = await session.execute(
-        select(ConfiguracaoOperacao).where(ConfiguracaoOperacao.id == 1)
-    )
-    cfg = cfg_result.scalar_one_or_none()
-    reserva_tecnica = cfg.reserva_tecnica_m2 if cfg else Decimal("0")
+    if operacao_urbana_id is not None:
+        ouc_result = await session.execute(
+            select(OperacaoUrbana).where(OperacaoUrbana.id == operacao_urbana_id)
+        )
+        ouc = ouc_result.scalar_one_or_none()
+        reserva_tecnica = ouc.reserva_tecnica_m2 if ouc else Decimal("0")
+    else:
+        cfg_result = await session.execute(
+            select(ConfiguracaoOperacao).where(ConfiguracaoOperacao.id == 1)
+        )
+        cfg = cfg_result.scalar_one_or_none()
+        reserva_tecnica = cfg.reserva_tecnica_m2 if cfg else Decimal("0")
 
     capacidade_total = sum(s.estoque_total_m2 for s in setores) + reserva_tecnica
     saldo_geral = sum(occ.disponivel for occ in setores_ocupacao)

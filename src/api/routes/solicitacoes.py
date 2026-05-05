@@ -11,6 +11,7 @@ Fluxo:
 
 Nenhuma lógica de negócio reside neste módulo — apenas orquestração.
 """
+import asyncio
 import uuid
 from typing import Annotated
 
@@ -63,8 +64,11 @@ async def criar_solicitacao(
             detail=str(exc),
         )
 
-    # 2. Calcular saldo do setor
-    saldo_setor = await saldo_repository.calcular_saldo(session, payload.setor)
+    # 2. Calcular saldo do setor e limites da OUC (em paralelo)
+    saldo_setor, limites_ouc = await asyncio.gather(
+        saldo_repository.calcular_saldo(session, payload.setor),
+        saldo_repository.get_limites_ouc(session, payload.setor),
+    )
 
     # 3. Montar SolicitacaoDTO
     solicitacao_dto = SolicitacaoDTO(
@@ -76,6 +80,8 @@ async def criar_solicitacao(
         titulo_ids=payload.titulo_ids,
         titulos=titulos,
         saldo_setor=saldo_setor,
+        incentivado=payload.incentivado,
+        limites_ouc=limites_ouc,
     )
 
     # 4. Validar pelo RulesEngine
@@ -110,6 +116,7 @@ async def criar_solicitacao(
             numero_processo_sei=payload.numero_processo_sei,
             operador=current_user.upn,
             motivo=f"Solicitacao {solicitacao_id}",
+            incentivado=payload.incentivado,
         )
 
     await session.commit()

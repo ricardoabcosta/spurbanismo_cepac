@@ -427,6 +427,9 @@ async def listar_propostas(
     page: Annotated[int, Query(ge=1, description="Número da página")] = 1,
     page_size: Annotated[int, Query(ge=1, le=100, description="Itens por página")] = 20,
     setor_id: Annotated[Optional[UUID], Query(description="Filtrar por UUID do setor")] = None,
+    operacao_urbana_id: Annotated[
+        Optional[int], Query(description="Filtrar por Operação Urbana")
+    ] = None,
     status_pa: Annotated[
         Optional[str], Query(description="Filtrar por status: ANALISE | DEFERIDO | INDEFERIDO")
     ] = None,
@@ -450,6 +453,7 @@ async def listar_propostas(
         page=page,
         page_size=page_size,
         setor_id=setor_id,
+        operacao_urbana_id=operacao_urbana_id,
         status_pa=status_pa,
         data_inicio=data_inicio,
         data_fim=data_fim,

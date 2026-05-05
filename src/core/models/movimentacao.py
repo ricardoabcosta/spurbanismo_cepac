@@ -88,6 +88,9 @@ class Movimentacao(Base):
     # Motivo da movimentação (livre ou valores convencionados acima)
     motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Espelha titulo_cepac.incentivado no momento da movimentação
+    incentivado: Mapped[bool | None] = mapped_column(nullable=True)
+
     # UPN ou sub extraído do JWT do operador responsável
     operador: Mapped[str] = mapped_column(String(200), nullable=False)
 

@@ -1,21 +1,26 @@
 """
-Rotas administrativas — setores, configuração global e gestão de usuários.
+Rotas administrativas — setores, operações urbanas, configuração global e gestão de usuários.
 
-GET   /admin/setores                       → require_tecnico  (leitura para combobox)
-POST  /admin/setores                       → require_diretor  (criação)
-PUT   /admin/setores/{id}                  → require_diretor  (edição completa)
-GET   /admin/configuracao                  → require_tecnico  (leitura)
-PUT   /admin/configuracao                  → require_diretor  (edição)
-GET   /admin/me                            → require_tecnico  (perfil do autenticado)
-GET   /admin/usuarios                      → require_diretor  (lista todos os usuários)
-PATCH /admin/usuarios/{id}/papel           → require_diretor  (altera papel)
-PATCH /admin/usuarios/{id}/ativo           → require_diretor  (ativa/desativa)
+GET   /admin/setores                            → require_tecnico  (leitura para combobox)
+POST  /admin/setores                            → require_diretor  (criação)
+PUT   /admin/setores/{id}                       → require_diretor  (edição completa)
+GET   /admin/operacoes-urbanas                  → require_tecnico  (lista todas as OUCs)
+POST  /admin/operacoes-urbanas                  → require_diretor  (criação)
+GET   /admin/operacoes-urbanas/{id}             → require_tecnico  (detalhe)
+PUT   /admin/operacoes-urbanas/{id}             → require_diretor  (edição)
+GET   /admin/operacoes-urbanas/{id}/setores     → require_tecnico  (setores de uma OUC)
+GET   /admin/configuracao                       → require_tecnico  (leitura)
+PUT   /admin/configuracao                       → require_diretor  (edição)
+GET   /admin/me                                 → require_tecnico  (perfil do autenticado)
+GET   /admin/usuarios                           → require_diretor  (lista todos os usuários)
+PATCH /admin/usuarios/{id}/papel                → require_diretor  (altera papel)
+PATCH /admin/usuarios/{id}/ativo                → require_diretor  (ativa/desativa)
 """
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,12 +30,16 @@ from src.api.schemas.admin import (
     AtivoUpdate,
     ConfiguracaoIn,
     ConfiguracaoOut,
+    OperacaoUrbanaIn,
+    OperacaoUrbanaOut,
+    OperacaoUrbanaResumo,
     PapelUpdate,
     SetorIn,
     SetorOut,
     UsuarioOut,
 )
 from src.core.models.configuracao_operacao import ConfiguracaoOperacao
+from src.core.models.operacao_urbana import OperacaoUrbana
 from src.core.models.setor import Setor
 from src.core.models.usuario import Usuario
 
@@ -49,10 +58,59 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 async def listar_setores(
     session: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    operacao_urbana_id: Annotated[
+        Optional[int], Query(description="Filtrar por ID da Operação Urbana")
+    ] = None,
 ) -> list[SetorOut]:
-    result = await session.execute(select(Setor).order_by(Setor.nome))
+    stmt = select(Setor)
+    if operacao_urbana_id is not None:
+        stmt = stmt.where(Setor.operacao_urbana_id == operacao_urbana_id)
+    stmt = stmt.order_by(Setor.nome)
+    result = await session.execute(stmt)
     setores = result.scalars().all()
     return [SetorOut.model_validate(s) for s in setores]
+
+
+async def _validar_referencias_setor(
+    session: AsyncSession,
+    payload: SetorIn,
+    setor_id: Optional[UUID] = None,
+) -> None:
+    """
+    Valida operacao_urbana_id e setor_pai_id do payload.
+    Lança HTTPException 422 se alguma restrição for violada.
+    """
+    # Verificar existência da OUC
+    ouc = await session.execute(
+        select(OperacaoUrbana).where(OperacaoUrbana.id == payload.operacao_urbana_id)
+    )
+    if ouc.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Operação Urbana não encontrada.",
+        )
+
+    # Verificar setor pai
+    if payload.setor_pai_id is not None:
+        # Impedir auto-referência (relevante no PUT)
+        if setor_id is not None and payload.setor_pai_id == setor_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Um setor não pode ser pai de si mesmo.",
+            )
+        pai_result = await session.execute(
+            select(Setor).where(Setor.id == payload.setor_pai_id)
+        )
+        pai = pai_result.scalar_one_or_none()
+        if (
+            pai is None
+            or not pai.ativo
+            or pai.operacao_urbana_id != payload.operacao_urbana_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Setor pai não pertence à mesma Operação Urbana.",
+            )
 
 
 @router.post(
@@ -72,6 +130,7 @@ async def criar_setor(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Setor '{payload.nome}' já existe.",
         )
+    await _validar_referencias_setor(session, payload)
     setor = Setor(**payload.model_dump())
     session.add(setor)
     await session.flush()
@@ -105,12 +164,156 @@ async def atualizar_setor(
             detail=f"Outro setor com nome '{payload.nome}' já existe.",
         )
 
+    await _validar_referencias_setor(session, payload, setor_id=setor_id)
+
     for field, value in payload.model_dump().items():
         setattr(setor, field, value)
 
     await session.commit()
     await session.refresh(setor)
     return SetorOut.model_validate(setor)
+
+
+# ---------------------------------------------------------------------------
+# Operações Urbanas Consorciadas (OUC)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/operacoes-urbanas",
+    response_model=list[OperacaoUrbanaOut],
+    summary="Listar Operações Urbanas",
+)
+async def listar_operacoes_urbanas(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    ativo: Annotated[
+        Optional[bool], Query(description="Filtrar por status ativo/inativo")
+    ] = None,
+) -> list[OperacaoUrbanaOut]:
+    stmt = select(OperacaoUrbana)
+    if ativo is not None:
+        stmt = stmt.where(OperacaoUrbana.ativo == ativo)
+    stmt = stmt.order_by(OperacaoUrbana.sigla)
+    result = await session.execute(stmt)
+    oucs = result.scalars().all()
+    return [OperacaoUrbanaOut.model_validate(o) for o in oucs]
+
+
+@router.post(
+    "/operacoes-urbanas",
+    response_model=OperacaoUrbanaOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Criar Operação Urbana",
+)
+async def criar_operacao_urbana(
+    payload: OperacaoUrbanaIn,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> OperacaoUrbanaOut:
+    existente = await session.execute(
+        select(OperacaoUrbana).where(OperacaoUrbana.sigla == payload.sigla)
+    )
+    if existente.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Operação Urbana com sigla '{payload.sigla}' já existe.",
+        )
+    ouc = OperacaoUrbana(**payload.model_dump())
+    session.add(ouc)
+    await session.flush()
+    await session.commit()
+    await session.refresh(ouc)
+    return OperacaoUrbanaOut.model_validate(ouc)
+
+
+@router.get(
+    "/operacoes-urbanas/{ouc_id}",
+    response_model=OperacaoUrbanaOut,
+    summary="Detalhe de Operação Urbana",
+)
+async def detalhar_operacao_urbana(
+    ouc_id: int,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+) -> OperacaoUrbanaOut:
+    result = await session.execute(
+        select(OperacaoUrbana).where(OperacaoUrbana.id == ouc_id)
+    )
+    ouc = result.scalar_one_or_none()
+    if ouc is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Operação Urbana não encontrada.",
+        )
+    return OperacaoUrbanaOut.model_validate(ouc)
+
+
+@router.put(
+    "/operacoes-urbanas/{ouc_id}",
+    response_model=OperacaoUrbanaOut,
+    summary="Atualizar Operação Urbana",
+)
+async def atualizar_operacao_urbana(
+    ouc_id: int,
+    payload: OperacaoUrbanaIn,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> OperacaoUrbanaOut:
+    result = await session.execute(
+        select(OperacaoUrbana).where(OperacaoUrbana.id == ouc_id)
+    )
+    ouc = result.scalar_one_or_none()
+    if ouc is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Operação Urbana não encontrada.",
+        )
+
+    conflito = await session.execute(
+        select(OperacaoUrbana).where(
+            OperacaoUrbana.sigla == payload.sigla,
+            OperacaoUrbana.id != ouc_id,
+        )
+    )
+    if conflito.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Outra Operação Urbana com sigla '{payload.sigla}' já existe.",
+        )
+
+    for field, value in payload.model_dump().items():
+        setattr(ouc, field, value)
+
+    await session.commit()
+    await session.refresh(ouc)
+    return OperacaoUrbanaOut.model_validate(ouc)
+
+
+@router.get(
+    "/operacoes-urbanas/{ouc_id}/setores",
+    response_model=list[SetorOut],
+    summary="Listar setores de uma Operação Urbana",
+)
+async def listar_setores_por_ouc(
+    ouc_id: int,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+) -> list[SetorOut]:
+    ouc_result = await session.execute(
+        select(OperacaoUrbana).where(OperacaoUrbana.id == ouc_id)
+    )
+    if ouc_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Operação Urbana não encontrada.",
+        )
+    result = await session.execute(
+        select(Setor)
+        .where(Setor.operacao_urbana_id == ouc_id)
+        .order_by(Setor.nome)
+    )
+    setores = result.scalars().all()
+    return [SetorOut.model_validate(s) for s in setores]
 
 
 # ---------------------------------------------------------------------------

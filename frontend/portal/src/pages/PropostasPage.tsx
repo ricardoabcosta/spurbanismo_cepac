@@ -6,9 +6,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { listarPropostasAE, listarSetores } from "../api/portal";
+import { listarOUCs } from "../api/admin";
 import PaginacaoControle from "../components/PaginacaoControle";
 import { useUser } from "../contexts/UserContext";
-import type { PropostaListItem, SetorBasico } from "../types/api";
+import type { PropostaListItem, SetorBasico, OperacaoUrbanaResumo } from "../types/api";
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -166,6 +167,7 @@ interface FiltrosAE {
   setor_id?: string;
   status_pa?: string;
   situacao_certidao?: string;
+  operacao_urbana_id?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +190,9 @@ export default function PropostasPage() {
 
   // Setores para o select
   const [setores, setSetores] = useState<SetorBasico[]>([]);
+
+  // OUCs para o select de filtro
+  const [oucs, setOucs] = useState<OperacaoUrbanaResumo[]>([]);
 
   // UI states
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
@@ -221,6 +226,12 @@ export default function PropostasPage() {
       .catch(() => {/* silencioso — select fica vazio */});
   }, []);
 
+  useEffect(() => {
+    listarOUCs(true)
+      .then((data) => { if (Array.isArray(data)) setOucs(data); })
+      .catch(() => {});
+  }, []);
+
   // ---------------------------------------------------------------------------
   // Carregar counts por status em paralelo (independente da paginação)
   // ---------------------------------------------------------------------------
@@ -228,9 +239,9 @@ export default function PropostasPage() {
   const carregarCounts = useCallback(async (f: FiltrosAE) => {
     try {
       const [rAnalise, rDeferido, rIndeferido] = await Promise.all([
-        listarPropostasAE({ ...f, page: 1, page_size: 1, status_pa: "ANALISE" }),
-        listarPropostasAE({ ...f, page: 1, page_size: 1, status_pa: "DEFERIDO" }),
-        listarPropostasAE({ ...f, page: 1, page_size: 1, status_pa: "INDEFERIDO" }),
+        listarPropostasAE({ ...f, page: 1, page_size: 1, status_pa: "ANALISE", operacao_urbana_id: f.operacao_urbana_id }),
+        listarPropostasAE({ ...f, page: 1, page_size: 1, status_pa: "DEFERIDO", operacao_urbana_id: f.operacao_urbana_id }),
+        listarPropostasAE({ ...f, page: 1, page_size: 1, status_pa: "INDEFERIDO", operacao_urbana_id: f.operacao_urbana_id }),
       ]);
       setCounts({
         ANALISE: rAnalise.total,
@@ -263,8 +274,8 @@ export default function PropostasPage() {
 
   useEffect(() => {
     void carregar(filtros);
-    // Recalcula counts sempre que os filtros de setor mudam (sem status_pa fixo)
-    void carregarCounts({ setor_id: filtros.setor_id });
+    // Recalcula counts sempre que os filtros mudam (sem status_pa fixo)
+    void carregarCounts({ setor_id: filtros.setor_id, operacao_urbana_id: filtros.operacao_urbana_id });
   }, [filtros, carregar, carregarCounts]);
 
   useEffect(() => {
@@ -386,7 +397,7 @@ export default function PropostasPage() {
                 }}
                 onMouseEnter={() => setHoveredAdm(true)}
                 onMouseLeave={() => setHoveredAdm(false)}
-                onClick={() => navigate("/admin/setores")}
+                onClick={() => navigate("/admin/operacoes-urbanas")}
               >
                 Administração
               </button>
@@ -691,6 +702,42 @@ export default function PropostasPage() {
               marginBottom: "20px",
             }}
           >
+            {/* OUC — select */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+              <label
+                htmlFor="f-ouc"
+                style={{ fontSize: "12px", color: "#555", fontWeight: 500 }}
+              >
+                OUC
+              </label>
+              <select
+                id="f-ouc"
+                style={{
+                  padding: "7px 10px",
+                  border: "1px solid #ccc",
+                  borderRadius: "5px",
+                  fontSize: "14px",
+                  minWidth: "200px",
+                  background: "#fff",
+                }}
+                value={filtrosTemp.operacao_urbana_id ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : undefined;
+                  setFiltrosTemp((f) => ({
+                    ...f,
+                    operacao_urbana_id: val,
+                    setor_id: undefined,
+                    page: 1,
+                  }));
+                }}
+              >
+                <option value="">Todas as OUCs</option>
+                {oucs.map((ouc) => (
+                  <option key={ouc.id} value={ouc.id}>{ouc.sigla} — {ouc.nome}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Setor — select */}
             <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
               <label
@@ -715,7 +762,10 @@ export default function PropostasPage() {
                 }
               >
                 <option value="">Todos os setores</option>
-                {setores.map((s) => (
+                {(filtrosTemp.operacao_urbana_id
+                  ? setores.filter((s) => s.operacao_urbana_id === filtrosTemp.operacao_urbana_id)
+                  : setores
+                ).map((s) => (
                   <option key={s.id} value={s.id}>{s.nome}</option>
                 ))}
               </select>

@@ -1,11 +1,12 @@
 /**
- * Página /admin/setores — CRUD de setores da OUCAE.
+ * Página /admin/setores — CRUD de setores da OUCAE (legado).
  * Leitura: TECNICO ou DIRETOR. Criação/edição: DIRETOR.
  */
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { listarSetores, criarSetor, atualizarSetor, lerConfiguracao, atualizarConfiguracao } from "../api/admin";
 import type { SetorOut, SetorIn, ConfiguracaoOperacao } from "../types/api";
+import CampoM2 from "../components/CampoM2";
 
 const estilos: Record<string, React.CSSProperties> = {
   pagina: { fontFamily: "system-ui, sans-serif", minHeight: "100vh", background: "#f5f7fa" },
@@ -48,6 +49,10 @@ const SETOR_VAZIO: SetorIn = {
   cepacs_convertidos_parametros: 0,
   cepacs_desvinculados_aca: 0,
   cepacs_desvinculados_parametros: 0,
+  operacao_urbana_id: 0,
+  setor_pai_id: null,
+  fator_equivalencia_f1: null,
+  fator_equivalencia_f2: null,
 };
 
 function numOuNull(v: string): number | null {
@@ -60,38 +65,6 @@ function fmt(v: string | null | undefined): string {
   return Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Input m² com formatação brasileira ao sair do campo. Estado interno sempre usa ponto como separador decimal. */
-function CampoM2({ id, value, onChange, placeholder, required, readOnly, extraStyle }: {
-  id: string;
-  value: string;
-  onChange?: (v: string) => void;
-  placeholder?: string;
-  required?: boolean;
-  readOnly?: boolean;
-  extraStyle?: React.CSSProperties;
-}) {
-  const [focused, setFocused] = useState(false);
-
-  const display = !focused && value !== "" && !isNaN(Number(value))
-    ? Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : value;
-
-  return (
-    <input
-      id={id}
-      style={{ ...estilos.input, ...(readOnly ? { background: "#f5f7fa", color: "#555", cursor: "not-allowed" } : {}), ...extraStyle }}
-      type="text"
-      inputMode="decimal"
-      value={display}
-      readOnly={readOnly}
-      required={required}
-      placeholder={placeholder}
-      onChange={(e) => onChange?.(e.target.value.replace(/\./g, "").replace(",", "."))}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-    />
-  );
-}
 
 interface FormState {
   nome: string;
@@ -136,6 +109,10 @@ function formParaPayload(f: FormState): SetorIn {
     cepacs_convertidos_parametros: parseInt(f.cepacs_convertidos_parametros) || 0,
     cepacs_desvinculados_aca: parseInt(f.cepacs_desvinculados_aca) || 0,
     cepacs_desvinculados_parametros: parseInt(f.cepacs_desvinculados_parametros) || 0,
+    operacao_urbana_id: 0,
+    setor_pai_id: null,
+    fator_equivalencia_f1: null,
+    fator_equivalencia_f2: null,
   };
 }
 

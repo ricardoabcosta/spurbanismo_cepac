@@ -71,6 +71,12 @@ MIGRATION_ORDER = [
     "016_fk_setor_operacao_urbana.sql",
     "017_setor_hierarquia_fatores.sql",
     "018_seed_fatores_equivalencia_oucae.sql",
+    "019_seed_setores_oucfl.sql",
+    "020_relaxa_check_teto_nr.sql",
+    "021_seed_setores_oucab.sql",
+    "022_ouc_teto_r_nao_incentivado.sql",
+    "023_incentivado_flag.sql",
+    "024_operacao_urbana_config_fields.sql",
 ]
 
 

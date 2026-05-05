@@ -1,26 +1,35 @@
 # Dicionário de Dados — Projeto CEPAC (SP Urbanismo)
-> PostgreSQL 15 · Gerado a partir das migrations 001–013
+> PostgreSQL 15 · Gerado a partir das migrations 001–020
 
 ---
 
 ## Visão Geral
 
-O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
+O banco possui **13 tabelas** organizadas em duas fases de desenvolvimento:
 
 | # | Tabela | Fase | Finalidade |
 |---|--------|------|------------|
-| 1 | `setor` | 1 | Setores da Operação Urbana |
-| 2 | `titulo_cepac` | 1 | Títulos CEPAC individuais |
-| 3 | `solicitacao_vinculacao` | 1 | Pedidos de vinculação de CEPACs |
-| 4 | `solicitacao_titulos` | 1 | Junção N:N solicitação ↔ título |
-| 5 | `movimentacao` | 1 | Log de auditoria (append-only) |
-| 6 | `proposta` | 2 | Projetos/empreendimentos |
-| 7 | `certidao` | 2 | Certidões emitidas |
-| 8 | `usuario` | 2 | Usuários Azure AD |
-| 9 | `documento_processo` | 2 | Metadados de docs no Blob Storage |
-| 10 | `medicao_obra` | 2 | Série histórica de medições |
-| 11 | `parametro_sistema` | 2 | Parâmetros configuráveis |
-| 12 | `configuracao_operacao` | 2 | Singleton com parâmetros globais |
+| 1 | `operacao_urbana` | 1 | Catálogo de Operações Urbanas Consorciadas |
+| 2 | `setor` | 1 | Setores de cada OUC (com hierarquia de subsetores) |
+| 3 | `titulo_cepac` | 1 | Títulos CEPAC individuais |
+| 4 | `solicitacao_vinculacao` | 1 | Pedidos de vinculação de CEPACs |
+| 5 | `solicitacao_titulos` | 1 | Junção N:N solicitação ↔ título |
+| 6 | `movimentacao` | 1 | Log de auditoria (append-only) |
+| 7 | `proposta` | 2 | Projetos/empreendimentos |
+| 8 | `certidao` | 2 | Certidões emitidas |
+| 9 | `usuario` | 2 | Usuários Azure AD |
+| 10 | `documento_processo` | 2 | Metadados de docs no Blob Storage |
+| 11 | `medicao_obra` | 2 | Série histórica de medições |
+| 12 | `parametro_sistema` | 2 | Parâmetros configuráveis |
+| 13 | `configuracao_operacao` | 2 | Singleton com parâmetros globais |
+
+**Dados de referência carregados:**
+
+| OUC | `operacao_urbana_id` | Setores |
+|-----|----------------------|---------|
+| Água Espraiada (AE) | 1 | Jabaquara, Brooklin, Berrini, Marginal Pinheiros, Chucri Zaidan |
+| Faria Lima (FL) | 2 | Hélio Pelegrino, Faria Lima, Pinheiros, Olimpíadas |
+| Água Branca (AB) | 3 | Setor A (pai), A3, Setor B, C, E (pai), E1, E2, F (pai), F1, F2, G, H, I1 |
 
 ---
 
@@ -41,32 +50,97 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 1 — `setor`
+## Tabela 1 — `operacao_urbana`
 
-> Parâmetros estruturais dos setores da OUCAE. Saldo nunca é armazenado; é sempre calculado via `movimentacao`.
+> Catálogo de Operações Urbanas Consorciadas (OUC) de São Paulo. Tabela de referência — seus parâmetros globais definem os limites de estoque de cada operação.
+
+| Coluna | Tipo | Nulo | Default | Descrição |
+|--------|------|------|---------|-----------|
+| `id` | SERIAL | NÃO | autoincrement | Chave primária |
+| `nome` | VARCHAR(100) | NÃO | — | Nome completo da OUC |
+| `sigla` | VARCHAR(5) | NÃO | — | Sigla única (AE, FL, AB) |
+| `lei_vigente` | VARCHAR(100) | SIM | NULL | Lei municipal vigente |
+| `estoque_maximo_global_r` | NUMERIC(15,2) | SIM | NULL | Estoque máximo global de uso R em m² |
+| `estoque_maximo_global_nr` | NUMERIC(15,2) | SIM | NULL | Estoque máximo global de uso NR em m² |
+| `possui_nuvem` | BOOLEAN | NÃO | FALSE | Indica se a OUC opera com CEPACs NUVEM |
+| `valor_cepac_ref` | NUMERIC(15,2) | SIM | NULL | Preço de referência do CEPAC (último leilão) |
+| `data_ultima_posicao` | DATE | SIM | NULL | Data de referência da última posição de estoque |
+| `ativo` | BOOLEAN | NÃO | TRUE | Se a OUC está operacional |
+
+**Constraints:** `pk_operacao_urbana` (PK), `uq_operacao_urbana_sigla` (UNIQUE sigla).
+
+**Dados atuais:**
+
+| sigla | nome | possui_nuvem |
+|-------|------|-------------|
+| AE | Operação Urbana Consorciada Água Espraiada | TRUE |
+| FL | Operação Urbana Consorciada Faria Lima | TRUE |
+| AB | Operação Urbana Consorciada Água Branca | FALSE |
+
+---
+
+## Tabela 2 — `setor`
+
+> Setores de cada Operação Urbana Consorciada. Armazena apenas parâmetros estruturais — saldo de CEPACs é sempre calculado via `movimentacao`, nunca armazenado aqui. Suporta hierarquia de subsetores via auto-referência.
 
 | Coluna | Tipo | Nulo | Default | Descrição |
 |--------|------|------|---------|-----------|
 | `id` | UUID | NÃO | gen_random_uuid() | Chave primária |
-| `nome` | VARCHAR(100) | NÃO | — | Nome do setor (único) |
-| `estoque_total_m2` | NUMERIC(15,2) | NÃO | — | Estoque total em m² (> 0) |
-| `teto_nr_m2` | NUMERIC(15,2) | NÃO | — | Teto de área NR em m² (> 0) |
-| `reserva_r_m2` | NUMERIC(15,2) | SIM | NULL | Reserva residencial (só Chucri Zaidan: 216.442,47 m²) |
-| `created_at` | TIMESTAMPTZ | NÃO | now() | Data de criação |
-| `ativo` | BOOLEAN | NÃO | TRUE | Se o setor está ativo |
-| `bloqueio_nr` | BOOLEAN | NÃO | FALSE | Bloqueia criação NR (Berrini: TRUE) |
-| `piso_r_percentual` | NUMERIC(5,2) | SIM | NULL | Piso mínimo de R% no consumido (Marginal Pinheiros: 30%) |
+| `nome` | VARCHAR(100) | NÃO | — | Nome do setor (único globalmente) |
+| `estoque_total_m2` | NUMERIC(15,2) | NÃO | — | Estoque total em m² |
+| `teto_nr_m2` | NUMERIC(15,2) | NÃO | — | Teto máximo de área NR em m² |
 | `teto_r_m2` | NUMERIC(15,2) | SIM | NULL | Teto máximo de área R em m² |
+| `reserva_r_m2` | NUMERIC(15,2) | SIM | NULL | Reserva residencial (só Chucri Zaidan: 216.442,47 m²) |
+| `piso_r_percentual` | NUMERIC(5,2) | SIM | NULL | Piso mínimo de R% no consumido (ex: Marginal Pinheiros = 30%) |
 | `cepacs_convertidos_aca` | INTEGER | NÃO | 0 | CEPACs convertidos via ACA |
 | `cepacs_convertidos_parametros` | INTEGER | NÃO | 0 | CEPACs convertidos via parâmetros |
 | `cepacs_desvinculados_aca` | INTEGER | NÃO | 0 | CEPACs desvinculados via ACA |
 | `cepacs_desvinculados_parametros` | INTEGER | NÃO | 0 | CEPACs desvinculados via parâmetros |
+| `ativo` | BOOLEAN | NÃO | TRUE | Se o setor está ativo |
+| `bloqueio_nr` | BOOLEAN | NÃO | FALSE | Bloqueia criação NR (ex: Berrini = TRUE) |
+| `created_at` | TIMESTAMPTZ | NÃO | now() | Data de criação |
+| `operacao_urbana_id` | INTEGER | NÃO | — | FK → operacao_urbana — identifica a qual OUC o setor pertence |
+| `setor_pai_id` | UUID | SIM | NULL | FK self-ref → setor — NULL = setor raiz; preenchido em subsetores (ex: OUCAB Setor A3 → Setor A) |
+| `fator_equivalencia_f1` | NUMERIC(10,6) | SIM | NULL | Fator F1 de equivalência de CEPACs (NULL em setores Pai/container) |
+| `fator_equivalencia_f2` | NUMERIC(10,6) | SIM | NULL | Fator F2 de equivalência de CEPACs (NULL em setores Pai/container) |
 
-**Constraints:** `pk_setor` (PK), `uq_setor_nome` (UNIQUE nome), checks em valores positivos.
+**Constraints:** `pk_setor` (PK), `uq_setor_nome` (UNIQUE nome), `fk_setor_operacao_urbana`, `fk_setor_pai` (self-ref, nullable).  
+**Índices:** `idx_setor_operacao_urbana_id`, `idx_setor_pai_id`.
+
+**Parâmetros por OUC:**
+
+| OUC | Setor | teto_r_m2 | teto_nr_m2 | estoque_total_m2 | F1 | F2 | setor_pai |
+|-----|-------|-----------|------------|-----------------|----|----|-----------|
+| AE | Jabaquara | NULL | 175.000 | 250.000 | 3.0 | 2.0 | — |
+| AE | Brooklin | NULL | 980.000 | 1.400.000 | 1.0 | 1.0 | — |
+| AE | Berrini | NULL | 175.000 | 350.000 | 1.0 | 2.0 | — |
+| AE | Marginal Pinheiros | NULL | 420.000 | 600.000 | 2.0 | 2.0 | — |
+| AE | Chucri Zaidan | NULL | 1.783.557,53 | 2.000.000 | 1.0 | 2.0 | — |
+| FL | Hélio Pelegrino | 292.445 | 182.505 | 474.950 | 1.0 | 1.0 | — |
+| FL | Faria Lima | 288.190 | 73.715 | 361.905 | 1.0 | 1.0 | — |
+| FL | Pinheiros | 286.695 | 96.600 | 383.295 | 1.0 | 1.0 | — |
+| FL | Olimpíadas | 190.440 | 95.565 | 286.005 | 1.0 | 1.0 | — |
+| AB | Setor A *(pai)* | 90.000 | 55.000 | 145.000 | — | — | — |
+| AB | Setor A3 | 90.000 | 55.000 | 145.000 | 1.0 | 0.8 | Setor A |
+| AB | Setor B | 300.000 | 110.000 | 410.000 | 0.8 | 0.7 | — |
+| AB | Setor C | 20.000 | 0 | 20.000 | 1.0 | 0.6 | — |
+| AB | Setor E *(pai)* | 270.000 | 130.000 | 400.000 | — | — | — |
+| AB | Setor E1 | 50.000 | 50.000 | 100.000 | 0.7 | 0.6 | Setor E |
+| AB | Setor E2 | 220.000 | 80.000 | 300.000 | 0.7 | 0.6 | Setor E |
+| AB | Setor F *(pai)* | 260.000 | 70.000 | 330.000 | — | — | — |
+| AB | Setor F1 | 60.000 | 40.000 | 100.000 | 0.7 | 0.6 | Setor F |
+| AB | Setor F2 | 200.000 | 30.000 | 230.000 | 0.7 | 0.6 | Setor F |
+| AB | Setor G | 15.000 | 15.000 | 30.000 | 0.4 | 0.6 | — |
+| AB | Setor H | 150.000 | 110.000 | 260.000 | 0.4 | 0.6 | — |
+| AB | Setor I1 | 15.000 | 10.000 | 25.000 | 0.4 | 0.6 | — |
+
+> **Nota OUCAE:** `teto_r_m2` é NULL em todos os setores da OUCAE exceto Chucri Zaidan (`reserva_r_m2 = 216.442,47`). `piso_r_percentual = 30%` em Marginal Pinheiros.  
+> **Nota OUCAB:** Setores Pai (A, E, F) têm `fator_equivalencia_f1/f2 = NULL` — são containers de agrupamento; os tetos do Pai equivalem à soma dos filhos.  
+> **Nota Setor C:** `teto_nr_m2 = 0` — setor exclusivamente residencial.
 
 ---
 
-## Tabela 2 — `titulo_cepac`
+## Tabela 3 — `titulo_cepac`
 
 > Cada título CEPAC individual. Estado transiciona via registro em `movimentacao`.
 
@@ -88,7 +162,7 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 3 — `solicitacao_vinculacao`
+## Tabela 4 — `solicitacao_vinculacao`
 
 > Pedidos de vinculação de CEPACs a processos SEI/SIMPROC.
 
@@ -104,14 +178,14 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 | `status` | status_solicitacao_enum | NÃO | `PENDENTE` | Status da solicitação |
 | `motivo_rejeicao` | TEXT | SIM | NULL | Obrigatório quando status = REJEITADA |
 | `created_at` | TIMESTAMPTZ | NÃO | now() | Data de criação |
-| `proposta_id` | UUID | SIM | NULL | FK → proposta (adicionado migration 005) |
+| `proposta_id` | UUID | SIM | NULL | FK → proposta (migration 005) |
 | `observacao` | TEXT | SIM | NULL | Observação livre (migration 005) |
 
 **Constraints:** PK, FK para setor (RESTRICT), FK opcional para proposta (RESTRICT), checks de consistência.
 
 ---
 
-## Tabela 4 — `solicitacao_titulos`
+## Tabela 5 — `solicitacao_titulos`
 
 > Tabela de junção N:N entre `solicitacao_vinculacao` e `titulo_cepac`.
 
@@ -125,7 +199,7 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 5 — `movimentacao`
+## Tabela 6 — `movimentacao`
 
 > Log de auditoria **append-only** de todas as transições de estado dos títulos. UPDATE e DELETE bloqueados por trigger.
 
@@ -143,13 +217,14 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 | `operador` | VARCHAR(200) | NÃO | — | UPN ou ID do sistema que operou |
 | `created_at` | TIMESTAMPTZ | NÃO | now() | Imutável — base do audit trail |
 
-**Triggers:** `trg_movimentacao_no_update` e `trg_movimentacao_no_delete` bloqueiam qualquer alteração.
+**Triggers:** `trg_movimentacao_no_update` e `trg_movimentacao_no_delete` bloqueiam qualquer alteração.  
+**Índice:** `idx_movimentacao_saldo` em (setor_id, uso, origem, estado_novo, created_at) — usado em todas as queries de saldo.
 
 ---
 
-## Tabela 6 — `proposta`
+## Tabela 7 — `proposta`
 
-> Cada projeto/empreendimento que solicitou vinculação de CEPACs na OUCAE. Código no formato AE-XXXX.
+> Cada projeto/empreendimento que solicitou vinculação de CEPACs.
 
 | Coluna | Tipo | Nulo | Default | Descrição |
 |--------|------|------|---------|-----------|
@@ -199,9 +274,9 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 7 — `certidao`
+## Tabela 8 — `certidao`
 
-> Certidões de vinculação, desvinculação e alteração emitidas pela SP Urbanismo. Append-only (base da Consulta Pública de Autenticidade).
+> Certidões de vinculação, desvinculação e alteração emitidas pela SP Urbanismo. Base da Consulta Pública de Autenticidade.
 
 | Coluna | Tipo | Nulo | Default | Descrição |
 |--------|------|------|---------|-----------|
@@ -234,7 +309,7 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 8 — `usuario`
+## Tabela 9 — `usuario`
 
 > Técnicos e Diretores autenticados via Azure AD. Roles gerenciados na aplicação (não no AD).
 
@@ -252,7 +327,7 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 9 — `documento_processo`
+## Tabela 10 — `documento_processo`
 
 > Metadados de documentos no Azure Blob Storage. O arquivo físico nunca transita pelo backend (upload via SAS URL). Append-only.
 
@@ -273,9 +348,9 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 10 — `medicao_obra`
+## Tabela 11 — `medicao_obra`
 
-> Série histórica de medições mensais de obras da OUCAE. Alimenta o "Custo Total Incorrido" do dashboard. Append-only.
+> Série histórica de medições mensais de obras. Alimenta o custo total incorrido do dashboard. Append-only.
 
 | Coluna | Tipo | Nulo | Default | Descrição |
 |--------|------|------|---------|-----------|
@@ -293,7 +368,7 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 11 — `parametro_sistema`
+## Tabela 12 — `parametro_sistema`
 
 > Pares chave-valor configuráveis. Atualizável por DIRETOR. Chaves predefinidas: `cepacs_em_circulacao`, `data_inicio_oucae`.
 
@@ -307,9 +382,9 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 
 ---
 
-## Tabela 12 — `configuracao_operacao`
+## Tabela 13 — `configuracao_operacao`
 
-> Singleton (id sempre = 1) com parâmetros globais da OUCAE.
+> Singleton (id sempre = 1) com parâmetros globais da operação.
 
 | Coluna | Tipo | Nulo | Default | Descrição |
 |--------|------|------|---------|-----------|
@@ -325,30 +400,60 @@ O banco possui **11 tabelas** organizadas em duas fases de desenvolvimento:
 ## Diagrama de Relacionamentos
 
 ```
-configuracao_operacao (singleton)
-
-setor ─────────────────────────┐
-  │                            │
-  ├──< titulo_cepac            │
-  │       │                   │
-  │       └──< movimentacao    │
-  │       │                   │
-  │       └──< solicitacao_titulos >──┐
-  │                            │     │
-  ├──< solicitacao_vinculacao ──┘     │
-  │       │                         │
-  │       └── proposta_id (opt) ─┐  │
-  │                              │  │
-  └──< proposta ─────────────────┘  │
-          │                         │
-          ├──< certidao             │
-          └──< documento_processo   │
-                  │                 │
-usuario ──────────┴─────────────────┘
+operacao_urbana
+  │
+  └──< setor ──────────────────────────┐ (setor_pai_id — self-ref)
+         │                             │
+         ├──< titulo_cepac             │
+         │       │                     │
+         │       ├──< movimentacao     │
+         │       │                     │
+         │       └──< solicitacao_titulos >──┐
+         │                                   │
+         ├──< solicitacao_vinculacao ─────────┘
+         │       │
+         │       └── proposta_id (opt) ─┐
+         │                              │
+         └──< proposta ─────────────────┘
+                 │
+                 ├──< certidao
+                 └──< documento_processo
+                         │
+usuario ─────────────────┴──────────────
   │
   ├──< medicao_obra
   └──< parametro_sistema
+
+configuracao_operacao (singleton — sem FK)
 ```
+
+---
+
+## Histórico de Migrations
+
+| Migration | Descrição |
+|-----------|-----------|
+| 001 | Schema inicial: setor, titulo_cepac, solicitacao_vinculacao, movimentacao |
+| 002 | Seed setores OUCAE (Brooklin, Berrini, Marginal Pinheiros, Chucri Zaidan, Jabaquara) |
+| 003 | Tabelas Fase 2: usuario, proposta, certidao, documento_processo |
+| 004 | Carga inicial real (399KB — dados históricos da OUCAE) |
+| 004a | Revoga seed sintético anterior à carga real |
+| 005 | Campos portal em proposta (proposta_id em solicitacao, observacao) |
+| 006 | Seed medicao_obra inicial |
+| 007 | Seed parametro_sistema |
+| 008 | ADD setor: ativo, bloqueio_nr, piso_r_percentual |
+| 009 | ADD setor: teto_r_m2 |
+| 010 | CREATE configuracao_operacao (singleton) |
+| 011 | ADD setor: campos CEPAC desagregados por origem (aca / parametros) |
+| 012 | Campos adicionais em proposta (planilha) |
+| 013 | Expansão tabela certidao |
+| 014 | Limpeza de certidões com formato inválido |
+| 015 | CREATE operacao_urbana + seed AE, FL, AB |
+| 016 | FK setor.operacao_urbana_id — todos os setores OUCAE → AE |
+| 017 | ADD setor: setor_pai_id (hierarquia) + fator_equivalencia_f1/f2 |
+| 018 | Seed F1/F2 dos setores OUCAE |
+| 019 | Seed setores OUC Faria Lima (4 setores) |
+| 020 | Seed setores OUC Água Branca (13 setores — 5 standalone, 3 pais, 5 filhos) |
 
 ---
 
@@ -366,3 +471,5 @@ usuario ──────────┴─────────────
 | `data_referencia` sempre primeiro dia do mês | CHECK em `medicao_obra` |
 | Usuário criado automaticamente no 1º login com papel=TECNICO | Lógica de aplicação |
 | Promoção a DIRETOR via endpoint PATCH /admin/usuarios/{id}/papel | API REST |
+| Setores Pai (OUCAB) são containers — F1/F2 sempre NULL | Convenção de dados |
+| `setor.nome` é UNIQUE globalmente entre todas as OUCs | UNIQUE constraint |

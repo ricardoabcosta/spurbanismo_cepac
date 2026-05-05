@@ -13,9 +13,9 @@ from typing import Optional
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.engine.dtos import SaldoSetorDTO
-from src.core.models import Movimentacao, Setor, TituloCepac
-from src.core.models.enums import EstadoTituloEnum
+from src.core.engine.dtos import LimitesOucDTO, SaldoSetorDTO
+from src.core.models import Movimentacao, OperacaoUrbana, Setor, TituloCepac
+from src.core.models.enums import EstadoTituloEnum, UsoEnum
 
 
 async def calcular_saldo(
@@ -129,4 +129,60 @@ async def calcular_saldo(
         r_consumido_nuvem=r_consumido_nuvem,
         r_em_analise=r_em_analise,
         consumo_total_global=Decimal(str(consumo_total_global)),
+    )
+
+
+async def get_limites_ouc(
+    session: AsyncSession,
+    setor_nome: str,
+) -> LimitesOucDTO:
+    """
+    Retorna os limites da OUC à qual o setor pertence.
+
+    Calcula também o total de R Não Incentivado (incentivado=FALSE) já
+    consumido/em análise em todos os setores da mesma OUC.
+
+    Para OUCs sem distinção R Inc/NI, teto_r_nao_incentivado_m2 é None
+    e r_nao_inc_consumido_global é 0 — o validator faz no-op automaticamente.
+    """
+    # Busca o teto da OUC via setor
+    stmt_ouc = (
+        select(OperacaoUrbana.teto_r_nao_incentivado_m2, OperacaoUrbana.id)
+        .join(Setor, Setor.operacao_urbana_id == OperacaoUrbana.id)
+        .where(Setor.nome == setor_nome)
+        .limit(1)
+    )
+    result_ouc = await session.execute(stmt_ouc)
+    row_ouc = result_ouc.one_or_none()
+
+    if row_ouc is None or row_ouc[0] is None:
+        return LimitesOucDTO(
+            teto_r_nao_incentivado_m2=None,
+            r_nao_inc_consumido_global=Decimal("0"),
+        )
+
+    teto = Decimal(str(row_ouc[0]))
+    ouc_id: int = row_ouc[1]
+
+    # Soma R Não Incentivado (incentivado=FALSE) consumido/em análise na OUC inteira
+    stmt_consumido = (
+        select(func.sum(TituloCepac.valor_m2).label("total_ni"))
+        .select_from(Movimentacao)
+        .join(TituloCepac, TituloCepac.id == Movimentacao.titulo_id)
+        .join(Setor, Setor.id == Movimentacao.setor_id)
+        .where(
+            Setor.operacao_urbana_id == ouc_id,
+            Movimentacao.uso == UsoEnum.R,
+            Movimentacao.incentivado.is_(False),
+            Movimentacao.estado_novo.in_(
+                [EstadoTituloEnum.CONSUMIDO, EstadoTituloEnum.EM_ANALISE]
+            ),
+        )
+    )
+    result_consumido = await session.execute(stmt_consumido)
+    consumido = result_consumido.scalar() or Decimal("0")
+
+    return LimitesOucDTO(
+        teto_r_nao_incentivado_m2=teto,
+        r_nao_inc_consumido_global=Decimal(str(consumido)),
     )

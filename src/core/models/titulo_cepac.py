@@ -65,6 +65,9 @@ class TituloCepac(Base):
     # Preenchido quando o título entra em QUARENTENA
     data_desvinculacao: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # NULL = OUC sem distinção; True = R Incentivado (HIS/HMP); False = R Não Incentivado
+    incentivado: Mapped[bool | None] = mapped_column(nullable=True)
+
     # --- Auditoria ---
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,

@@ -15,6 +15,8 @@ import DetalhesPropostaPage from "./pages/DetalhesPropostaPage";
 import SetoresAdminPage from "./pages/SetoresAdminPage";
 import UsuariosAdminPage from "./pages/UsuariosAdminPage";
 import DashboardPage from "./pages/DashboardPage";
+import OUCAdminPage from "./pages/OUCAdminPage";
+import SetoresPorOUCPage from "./pages/SetoresPorOUCPage";
 
 const App: React.FC = () => (
   <MsalProvider instance={msalInstance}>
@@ -27,8 +29,13 @@ const App: React.FC = () => (
           <Route path="/propostas/nova" element={<ProtectedRoute><NovaPropostaPage /></ProtectedRoute>} />
           <Route path="/propostas/:codigo" element={<ProtectedRoute><DetalhesPropostaPage /></ProtectedRoute>} />
 
-          <Route path="/admin/setores" element={<ProtectedRoute><SetoresAdminPage /></ProtectedRoute>} />
+          <Route path="/admin/setores" element={<Navigate to="/admin/operacoes-urbanas" replace />} />
+          <Route path="/admin/operacoes-urbanas" element={<ProtectedRoute><OUCAdminPage /></ProtectedRoute>} />
+          <Route path="/admin/operacoes-urbanas/:oucId/setores" element={<ProtectedRoute><SetoresPorOUCPage /></ProtectedRoute>} />
           <Route path="/admin/usuarios" element={<ProtectedRoute><UsuariosAdminPage /></ProtectedRoute>} />
+
+          {/* Rota legado de setores mantida como fallback (para acesso direto ainda funcionar) */}
+          <Route path="/admin/setores-legado" element={<ProtectedRoute><SetoresAdminPage /></ProtectedRoute>} />
 
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
 

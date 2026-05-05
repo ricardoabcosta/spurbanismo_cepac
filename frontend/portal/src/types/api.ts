@@ -199,6 +199,10 @@ export interface SetorOut {
   cepacs_convertidos_parametros: number;
   cepacs_desvinculados_aca: number;
   cepacs_desvinculados_parametros: number;
+  operacao_urbana_id: number;
+  setor_pai_id: string | null;
+  fator_equivalencia_f1: string | null;
+  fator_equivalencia_f2: string | null;
 }
 
 export interface ConfiguracaoOperacao {
@@ -220,6 +224,7 @@ export interface SetorIn {
   nome: string;
   estoque_total_m2: number;
   teto_nr_m2: number;
+  teto_r_m2?: number | null;
   reserva_r_m2: number | null;
   piso_r_percentual: number | null;
   bloqueio_nr: boolean;
@@ -228,6 +233,10 @@ export interface SetorIn {
   cepacs_convertidos_parametros: number;
   cepacs_desvinculados_aca: number;
   cepacs_desvinculados_parametros: number;
+  operacao_urbana_id: number;
+  setor_pai_id: string | null;
+  fator_equivalencia_f1: number | null;
+  fator_equivalencia_f2: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +307,53 @@ export interface PaginacaoPropostaList {
 export interface SetorBasico {
   id: string;
   nome: string;
+  operacao_urbana_id: number;
+}
+
+// ---------------------------------------------------------------------------
+// Operação Urbana (admin)
+// ---------------------------------------------------------------------------
+
+export interface OperacaoUrbanaOut {
+  id: number;
+  nome: string;
+  sigla: string;
+  lei_vigente: string | null;
+  estoque_maximo_global_r: string | null;
+  estoque_maximo_global_nr: string | null;
+  possui_nuvem: boolean;
+  valor_cepac_ref: string | null;
+  data_ultima_posicao: string | null;
+  ativo: boolean;
+  teto_r_nao_incentivado_m2: string | null;
+  reserva_tecnica_m2: string;
+  cepacs_leiloados: number;
+  cepacs_colocacao_privada: number;
+  cepacs_totais: number;
+}
+
+export interface OperacaoUrbanaIn {
+  nome: string;
+  sigla: string;
+  lei_vigente: string | null;
+  estoque_maximo_global_r: number | null;
+  estoque_maximo_global_nr: number | null;
+  possui_nuvem: boolean;
+  valor_cepac_ref: number | null;
+  data_ultima_posicao: string | null;
+  ativo: boolean;
+  teto_r_nao_incentivado_m2: number | null;
+  reserva_tecnica_m2: number;
+  cepacs_leiloados: number;
+  cepacs_colocacao_privada: number;
+  cepacs_totais: number;
+}
+
+export interface OperacaoUrbanaResumo {
+  id: number;
+  sigla: string;
+  nome: string;
+  ativo: boolean;
 }
 
 // ---------------------------------------------------------------------------

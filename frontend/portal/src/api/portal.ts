@@ -131,6 +131,7 @@ export async function listarPropostasAE(params: {
   setor_id?: string;
   status_pa?: string;
   situacao_certidao?: string;
+  operacao_urbana_id?: number;
 }): Promise<PaginacaoPropostaList> {
   const qs = new URLSearchParams();
   qs.set("page", String(params.page ?? 1));
@@ -138,6 +139,7 @@ export async function listarPropostasAE(params: {
   if (params.setor_id) qs.set("setor_id", params.setor_id);
   if (params.status_pa) qs.set("status_pa", params.status_pa);
   if (params.situacao_certidao) qs.set("situacao_certidao", params.situacao_certidao);
+  if (params.operacao_urbana_id) qs.set("operacao_urbana_id", String(params.operacao_urbana_id));
 
   const { data } = await apiClient.get<PaginacaoPropostaList>(
     `/portal/propostas?${qs.toString()}`

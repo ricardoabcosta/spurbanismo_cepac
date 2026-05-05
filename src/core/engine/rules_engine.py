@@ -2,18 +2,22 @@
 RulesEngine — orquestrador principal do motor de regras CEPAC.
 
 Executa os validators na ordem correta para cada setor. A ordem é:
-  1. sei          — sempre primeiro (falha rápida, sem cálculos)
-  2. capacity     — teto global da operação
-  3. <setorial>   — regra de negócio específica do setor
-  4. quarantine   — disponibilidade individual de cada título do lote
+  1. sei               — sempre primeiro (falha rápida, sem cálculos)
+  2. capacity          — teto global da operação
+  3. <setorial>        — regra de negócio específica do setor
+  4. r_nao_incentivado — teto R Não Incentivado (OUCAB — no-op para demais OUCs)
+  5. quarantine        — disponibilidade individual de cada título do lote
 
-Setores reconhecidos: Brooklin, Berrini, Marginal Pinheiros,
-                       Chucri Zaidan, Jabaquara.
+Setores reconhecidos:
+  OUCAE: Brooklin, Berrini, Marginal Pinheiros, Chucri Zaidan, Jabaquara
+  OUCFL: Hélio Pelegrino, Faria Lima, Pinheiros, Olimpíadas
+  OUCAB: Setor A, Setor A3, Setor B, Setor C, Setor E, Setor E1, Setor E2,
+          Setor F, Setor F1, Setor F2, Setor G, Setor H, Setor I1
 
 O RulesEngine não acessa banco de dados, não instancia modelos ORM e
 não tem dependência de FastAPI. Todos os dados necessários chegam via
-SolicitacaoDTO, que carrega SaldoSetorDTO e TituloDTO pré-calculados
-pelo repositório.
+SolicitacaoDTO, que carrega SaldoSetorDTO, LimitesOucDTO e TituloDTO
+pré-calculados pelo repositório.
 """
 from src.core.engine.dtos import RulesError, SolicitacaoDTO, ValidationResult
 from src.core.engine.validators import (
@@ -24,16 +28,39 @@ from src.core.engine.validators import (
     jabaquara,
     marginal_pinheiros,
     quarantine,
+    r_nao_incentivado,
     sei,
 )
 
 # Mapeamento setor → sequência de validators a executar (em ordem)
 VALIDATORS_POR_SETOR: dict[str, list] = {
-    "Brooklin":          [sei, capacity, brooklin,          quarantine],
-    "Berrini":           [sei, capacity, berrini,           quarantine],
+    # OUCAE — Água Espraiada
+    "Brooklin":          [sei, capacity, brooklin,           quarantine],
+    "Berrini":           [sei, capacity, berrini,            quarantine],
     "Marginal Pinheiros":[sei, capacity, marginal_pinheiros, quarantine],
-    "Chucri Zaidan":     [sei, capacity, chucri_zaidan,     quarantine],
-    "Jabaquara":         [sei, capacity, jabaquara,         quarantine],
+    "Chucri Zaidan":     [sei, capacity, chucri_zaidan,      quarantine],
+    "Jabaquara":         [sei, capacity, jabaquara,          quarantine],
+
+    # OUCFL — Faria Lima (sem regras setoriais específicas além de SEI + quarentena)
+    "Hélio Pelegrino":   [sei, quarantine],
+    "Faria Lima":        [sei, quarantine],
+    "Pinheiros":         [sei, quarantine],
+    "Olimpíadas":        [sei, quarantine],
+
+    # OUCAB — Água Branca (r_nao_incentivado é no-op para R Incentivado/NR)
+    "Setor A":           [sei, r_nao_incentivado, quarantine],
+    "Setor A3":          [sei, r_nao_incentivado, quarantine],
+    "Setor B":           [sei, r_nao_incentivado, quarantine],
+    "Setor C":           [sei, r_nao_incentivado, quarantine],
+    "Setor E":           [sei, r_nao_incentivado, quarantine],
+    "Setor E1":          [sei, r_nao_incentivado, quarantine],
+    "Setor E2":          [sei, r_nao_incentivado, quarantine],
+    "Setor F":           [sei, r_nao_incentivado, quarantine],
+    "Setor F1":          [sei, r_nao_incentivado, quarantine],
+    "Setor F2":          [sei, r_nao_incentivado, quarantine],
+    "Setor G":           [sei, r_nao_incentivado, quarantine],
+    "Setor H":           [sei, r_nao_incentivado, quarantine],
+    "Setor I1":          [sei, r_nao_incentivado, quarantine],
 }
 
 

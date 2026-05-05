@@ -54,6 +54,7 @@ async def transicionar_estado(
     numero_processo_sei: str,
     operador: str,
     motivo: Optional[str] = None,
+    incentivado: Optional[bool] = None,
 ) -> None:
     """
     Transiciona o estado de um título e registra a movimentação correspondente.
@@ -89,6 +90,7 @@ async def transicionar_estado(
         numero_processo_sei=numero_processo_sei,
         operador=operador,
         motivo=motivo,
+        incentivado=incentivado,
     )
     session.add(movimentacao)
 

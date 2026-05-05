@@ -80,6 +80,9 @@ class SolicitacaoVinculacao(Base):
     # Observação livre do técnico ao registrar a solicitação
     observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # NULL = OUC sem distinção; True = R Incentivado (HIS/HMP); False = R Não Incentivado
+    incentivado: Mapped[bool | None] = mapped_column(nullable=True)
+
     # --- Auditoria ---
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,

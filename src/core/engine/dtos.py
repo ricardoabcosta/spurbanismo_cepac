@@ -51,6 +51,22 @@ class SaldoSetorDTO:
 
 
 @dataclass(frozen=True)
+class LimitesOucDTO:
+    """
+    Parâmetros de limite da OUC onde o setor está inserido.
+
+    Lido do banco pelo repositório e repassado ao RulesEngine — sem acesso
+    direto ao banco dentro do engine.
+
+    teto_r_nao_incentivado_m2: None → OUC sem distinção (OUCAE, OUCFL).
+    r_nao_inc_consumido_global: total de R Não Incentivado já consumido/em análise
+                                 em todos os setores da OUC.
+    """
+    teto_r_nao_incentivado_m2: Optional[Decimal]
+    r_nao_inc_consumido_global: Decimal
+
+
+@dataclass(frozen=True)
 class SolicitacaoDTO:
     """Dados de uma solicitação de vinculação submetida ao motor de regras."""
     setor: str
@@ -61,6 +77,8 @@ class SolicitacaoDTO:
     titulo_ids: list[UUID]
     titulos: list[TituloDTO]        # snapshots dos títulos do lote
     saldo_setor: SaldoSetorDTO      # pré-calculado pelo repositório
+    incentivado: Optional[bool] = None      # None = OUC sem distinção
+    limites_ouc: Optional["LimitesOucDTO"] = None  # None = OUC sem limites adicionais
 
     @property
     def area_nr_m2(self) -> Decimal:

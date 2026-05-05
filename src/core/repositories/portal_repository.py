@@ -189,6 +189,7 @@ async def listar_propostas(
     page: int = 1,
     page_size: int = 20,
     setor_id: Optional[UUID] = None,
+    operacao_urbana_id: Optional[int] = None,
     status_pa: Optional[str] = None,
     data_inicio: Optional[date] = None,
     data_fim: Optional[date] = None,
@@ -209,6 +210,18 @@ async def listar_propostas(
     if setor_id is not None:
         stmt_base = stmt_base.where(Proposta.setor_id == setor_id)
         count_base = count_base.where(Proposta.setor_id == setor_id)
+
+    if operacao_urbana_id is not None:
+        # Quando setor_id não foi informado, precisamos de JOIN com Setor.
+        # Quando setor_id foi informado, a filtragem já restringe a um setor
+        # específico; o JOIN adicional com Setor permite filtrar por OUC sem
+        # duplicidade (SQLAlchemy deduplicará joins idênticos na mesma query).
+        stmt_base = stmt_base.join(Setor, Setor.id == Proposta.setor_id).where(
+            Setor.operacao_urbana_id == operacao_urbana_id
+        )
+        count_base = count_base.join(Setor, Setor.id == Proposta.setor_id).where(
+            Setor.operacao_urbana_id == operacao_urbana_id
+        )
 
     if status_pa is not None:
         stmt_base = stmt_base.where(Proposta.status_pa == status_pa)

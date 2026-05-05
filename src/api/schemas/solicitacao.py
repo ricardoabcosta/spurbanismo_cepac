@@ -21,6 +21,13 @@ class SolicitacaoIn(BaseModel):
         description="Número do processo SEI — obrigatório e não vazio",
     )
     titulo_ids: list[UUID] = Field(..., min_length=1, description="IDs dos títulos a vincular")
+    incentivado: Optional[bool] = Field(
+        None,
+        description=(
+            "Indica R Incentivado (HIS/HMP). "
+            "Obrigatório para setores OUCAB com uso=R; ignorado para demais OUCs."
+        ),
+    )
 
     @field_validator("numero_processo_sei")
     @classmethod

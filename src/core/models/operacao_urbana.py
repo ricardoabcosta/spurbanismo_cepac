@@ -42,6 +42,19 @@ class OperacaoUrbana(Base):
     data_ultima_posicao: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # Limite de R Não Incentivado — NULL para OUCs sem distinção (OUCAE, OUCFL)
+    teto_r_nao_incentivado_m2: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(15, 2), nullable=True
+    )
+
+    # Campos migrados de configuracao_operacao (Fase 3, Opção B)
+    reserva_tecnica_m2: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2), nullable=False, default=Decimal("0")
+    )
+    cepacs_leiloados: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cepacs_colocacao_privada: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cepacs_totais: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     setores: Mapped[list["Setor"]] = relationship(
         "Setor", back_populates="operacao_urbana", lazy="select"
     )

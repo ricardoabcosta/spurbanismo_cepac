@@ -43,10 +43,10 @@ export async function fetchCepacSnapshot(oucId?: number): Promise<CepacSnapshot>
 }
 
 /**
- * GET /admin/operacoes-urbanas?ativo=true  — lista OUCs ativas para o seletor
+ * GET /dashboard/operacoes-urbanas?ativo=true  — lista OUCs ativas para o seletor
  */
 export async function fetchOperacoesUrbanas(): Promise<OperacaoUrbanaResumo[]> {
-  const response = await apiClient.get<OperacaoUrbanaResumo[]>("/admin/operacoes-urbanas", {
+  const response = await apiClient.get<OperacaoUrbanaResumo[]>("/dashboard/operacoes-urbanas", {
     params: { ativo: true },
   });
   return response.data;

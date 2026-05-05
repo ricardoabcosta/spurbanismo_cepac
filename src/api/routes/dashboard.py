@@ -19,6 +19,7 @@ from src.core.models.enums import PapelUsuarioEnum
 from src.api.dependencies import get_db
 from sqlalchemy import select
 
+from src.api.schemas.admin import OperacaoUrbanaResumo
 from src.api.schemas.dashboard import (
     AlertaSetorialOut,
     CepacSetorOut,
@@ -34,6 +35,30 @@ from src.core.models.setor import Setor
 from src.core.repositories import dashboard_repository
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+# ---------------------------------------------------------------------------
+# GET /dashboard/operacoes-urbanas  (seletor do frontend do dashboard)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/operacoes-urbanas",
+    response_model=list[OperacaoUrbanaResumo],
+    status_code=status.HTTP_200_OK,
+    summary="Lista Operações Urbanas ativas para o seletor do Dashboard",
+)
+async def listar_operacoes_urbanas(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    ativo: Annotated[Optional[bool], Query(description="Filtra por ativo")] = None,
+) -> list[OperacaoUrbanaResumo]:
+    """Retorna a lista de OUCs para popular o seletor do Dashboard."""
+    stmt = select(OperacaoUrbana).order_by(OperacaoUrbana.id)
+    if ativo is not None:
+        stmt = stmt.where(OperacaoUrbana.ativo == ativo)
+    result = await session.execute(stmt)
+    oucs = result.scalars().all()
+    return [OperacaoUrbanaResumo.model_validate(o) for o in oucs]
 
 
 # ---------------------------------------------------------------------------

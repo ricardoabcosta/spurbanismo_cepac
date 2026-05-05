@@ -32,7 +32,6 @@ from src.api.schemas.admin import (
     ConfiguracaoOut,
     OperacaoUrbanaIn,
     OperacaoUrbanaOut,
-    OperacaoUrbanaResumo,
     PapelUpdate,
     SetorIn,
     SetorOut,

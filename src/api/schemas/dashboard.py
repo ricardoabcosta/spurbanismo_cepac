@@ -19,7 +19,7 @@ class AlertaSetorialOut(BaseModel):
     """Trava ativa em um setor."""
 
     setor: str
-    tipo: Literal["TETO_NR_EXCEDIDO", "RESERVA_R_VIOLADA"]
+    tipo: Literal["TETO_NR_EXCEDIDO", "RESERVA_R_VIOLADA", "NR_PROXIMO_LIMITE", "R_ABAIXO_ESPERADO"]
     mensagem: str
 
 

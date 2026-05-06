@@ -86,7 +86,7 @@ async def test_alertas_retorna_lista(client_tecnico: AsyncClient) -> None:
     for alerta in alertas:
         assert "setor" in alerta
         assert "tipo" in alerta
-        assert alerta["tipo"] in ("TETO_NR_EXCEDIDO", "RESERVA_R_VIOLADA")
+        assert alerta["tipo"] in ("TETO_NR_EXCEDIDO", "RESERVA_R_VIOLADA", "NR_PROXIMO_LIMITE", "R_ABAIXO_ESPERADO")
 
 
 @pytest.mark.asyncio

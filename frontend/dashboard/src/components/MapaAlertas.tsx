@@ -8,6 +8,8 @@ import type { AlertaSetorial } from "../types/api";
 const ICONE: Record<string, string> = {
   TETO_NR_EXCEDIDO: "🔴",
   RESERVA_R_VIOLADA: "🟡",
+  NR_PROXIMO_LIMITE: "🟠",
+  R_ABAIXO_ESPERADO: "🟠",
 };
 
 interface Props {
@@ -61,7 +63,10 @@ const MapaAlertas: React.FC<Props> = ({ alertas }) => (
                   display: "inline-block",
                   marginTop: 4,
                   fontSize: 11,
-                  color: alerta.tipo === "TETO_NR_EXCEDIDO" ? "#c62828" : "#e65100",
+                  color:
+                    alerta.tipo === "TETO_NR_EXCEDIDO" || alerta.tipo === "RESERVA_R_VIOLADA"
+                      ? "#c62828"
+                      : "#EF9F27",
                   fontWeight: 600,
                   textTransform: "uppercase",
                   letterSpacing: ".4px",

@@ -231,9 +231,14 @@ def calcular_alertas(
     """
     Deriva os alertas ativos a partir da ocupação já calculada.
 
-    Tipos de alerta:
+    Tipos de alerta (VERMELHO — crítico):
     - TETO_NR_EXCEDIDO  : nr_comprometido >= teto_nr (ex: Berrini)
     - RESERVA_R_VIOLADA : nr_comprometido > estoque_total − reserva_r (ex: Chucri Zaidan)
+
+    Tipos de alerta (LARANJA — atenção):
+    - NR_PROXIMO_LIMITE : NR entre 80% e 100% do teto
+    - R_ABAIXO_ESPERADO : consumo R entre 30% e 60% do piso (laranja)
+                           consumo R < 30% do piso (vermelho — crítico)
     """
     setor_map = {s.nome: s for s in setores_orm}
 
@@ -242,6 +247,16 @@ def calcular_alertas(
     for occ in setores_ocupacao:
         setor_orm = setor_map.get(occ.nome)
         nr_comprometido = occ.consumido_nr + occ.em_analise_nr
+
+        # Calcular percentuais de consumo
+        consumo_total_r = occ.consumido_r + occ.em_analise_r
+        pct_r = float(consumo_total_r / occ.estoque_total * 100) if occ.estoque_total > 0 else 0.0
+
+        pct_nr = 0.0
+        if occ.teto_nr is not None and occ.teto_nr > 0:
+            pct_nr = float(nr_comprometido / occ.teto_nr * 100)
+
+        # ── Alertas VERMELHOS (crítico) ──────────────────────────────
 
         # TETO_NR_EXCEDIDO
         if occ.bloqueado_nr:
@@ -271,6 +286,50 @@ def calcular_alertas(
                         ),
                     )
                 )
+
+        # R muito abaixo do mínimo (vermelho — < 30%)
+        if pct_r < 30:
+            alertas.append(
+                AlertaDTO(
+                    setor=occ.nome,
+                    tipo="R_ABAIXO_ESPERADO",
+                    mensagem=(
+                        f"{occ.nome}: consumo R muito abaixo do mínimo "
+                        f"({consumo_total_r:,.2f} m² comprometidos, "
+                        f"{pct_r:.1f}% do estoque total)."
+                    ),
+                )
+            )
+
+        # ── Alertas LARANJA (atenção) ────────────────────────────────
+
+        # NR próximo do limite (80% ≤ pctNR < 100%)
+        if occ.teto_nr is not None and 80 <= pct_nr < 100:
+            alertas.append(
+                AlertaDTO(
+                    setor=occ.nome,
+                    tipo="NR_PROXIMO_LIMITE",
+                    mensagem=(
+                        f"{occ.nome}: NR próximo do limite "
+                        f"({nr_comprometido:,.2f} m² comprometidos de "
+                        f"{occ.teto_nr:,.2f} m² — {pct_nr:.1f}%)."
+                    ),
+                )
+            )
+
+        # R abaixo do esperado (30% ≤ pctR < 60%) — laranja
+        if 30 <= pct_r < 60:
+            alertas.append(
+                AlertaDTO(
+                    setor=occ.nome,
+                    tipo="R_ABAIXO_ESPERADO",
+                    mensagem=(
+                        f"{occ.nome}: consumo R abaixo do esperado "
+                        f"({consumo_total_r:,.2f} m² comprometidos, "
+                        f"{pct_r:.1f}% do estoque total)."
+                    ),
+                )
+            )
 
     return alertas
 

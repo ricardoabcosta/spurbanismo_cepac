@@ -55,15 +55,11 @@ const fmt = (v: number) =>
 
 function consumeColor(pct: number, isR: boolean): string {
   if (isR) {
-    // R = piso (mínimo): baixo consumo é o problema, alto é bom
-    if (pct < 30) return "#E24B4A";  // crítico: muito abaixo do mínimo
-    if (pct < 60) return "#EF9F27";  // alerta: abaixo do esperado
-    return "#185FA5";                 // saudável (inclui >100%)
+    // R = piso (mínimo): abaixo de 100% = não atingiu o mínimo → vermelho
+    return pct >= 100 ? "#185FA5" : "#E24B4A";
   } else {
-    // NR = teto (máximo): alto consumo é o problema
-    if (pct >= 100) return "#E24B4A"; // crítico: excedeu o limite
-    if (pct >= 80) return "#EF9F27";  // alerta: próximo do limite
-    return "#1D9E75";                  // seguro
+    // NR = teto (máximo): >= 100% = estourou o limite → vermelho
+    return pct >= 100 ? "#E24B4A" : "#185FA5";
   }
 }
 
@@ -211,9 +207,9 @@ const GraficoEstoqueSetores: React.FC<Props> = ({ setores }) => {
         {[
           { color: "#185FA5", label: "Consumido R" },
           { color: "#B5D4F4", label: "Disponivel R" },
-          { color: "#1D9E75", label: "Consumido NR" },
-          { color: "#9FE1CB", label: "Disponivel NR" },
-          { color: "#E24B4A", label: "NR Estourado" },
+          { color: "#185FA5", label: "Consumido NR" },
+          { color: "#B5D4F4", label: "Disponivel NR" },
+          { color: "#E24B4A", label: "Estourado" },
         ].map(({ color, label }) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <div style={{ width: 12, height: 12, background: color, borderRadius: 2 }} />
@@ -245,7 +241,7 @@ const GraficoEstoqueSetores: React.FC<Props> = ({ setores }) => {
           const isSelected = selecionado === i;
           const isActive = selecionado === null || isSelected;
           const borderColor =
-            d.pctR >= 100 || d.pctNR >= 100 ? "#E24B4A" : "#185FA5";
+            d.pctNR >= 100 ? "#E24B4A" : "#185FA5";
 
           return (
             <div

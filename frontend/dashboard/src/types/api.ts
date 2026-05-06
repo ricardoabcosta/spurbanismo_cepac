@@ -3,7 +3,7 @@
  */
 
 export type PrazoZona = "VERDE" | "AMARELO" | "VERMELHO";
-export type AlertaTipo = "TETO_NR_EXCEDIDO" | "RESERVA_R_VIOLADA";
+export type AlertaTipo = "TETO_NR_EXCEDIDO" | "RESERVA_R_VIOLADA" | "NR_PROXIMO_LIMITE" | "R_ABAIXO_ESPERADO";
 
 export interface AlertaSetorial {
   setor: string;

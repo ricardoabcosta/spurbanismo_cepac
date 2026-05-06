@@ -112,7 +112,11 @@ async def snapshot(
         prazo_dias_restantes=dados["prazo_dias_restantes"],
         prazo_zona=dados["prazo_zona"],
         alertas=[
-            AlertaSetorialOut(setor=a.setor, tipo=a.tipo, mensagem=a.mensagem)
+            AlertaSetorialOut(
+                setor=a.setor,
+                tipo=a.tipo,
+                mensagem=a.mensagem,
+            )
             for a in dados["alertas"]
         ],
         setores=[
@@ -201,7 +205,14 @@ async def alertas(
     ocupacao = await dashboard_repository.calcular_ocupacao_setores(session, setores=setores_orm)
     dtos = dashboard_repository.calcular_alertas(ocupacao, setores_orm)
     return [
-        AlertaSetorialOut(setor=a.setor, tipo=cast(Literal["TETO_NR_EXCEDIDO", "RESERVA_R_VIOLADA"], a.tipo), mensagem=a.mensagem)
+        AlertaSetorialOut(
+            setor=a.setor,
+            tipo=cast(
+                Literal["TETO_NR_EXCEDIDO", "RESERVA_R_VIOLADA", "NR_PROXIMO_LIMITE", "R_ABAIXO_ESPERADO"],
+                a.tipo,
+            ),
+            mensagem=a.mensagem,
+        )
         for a in dtos
     ]
 

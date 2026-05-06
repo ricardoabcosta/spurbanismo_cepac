@@ -244,7 +244,7 @@ const DashboardPage: React.FC = () => {
               height="22"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={(data?.alertas.length ?? 0) > 0 ? "#c62828" : "#555"}
+              stroke={(data?.alertas.length ?? 0) > 0 ? "#EF9F27" : "#555"}
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -258,7 +258,7 @@ const DashboardPage: React.FC = () => {
                   position: "absolute",
                   top: 2,
                   right: 2,
-                  background: "#c62828",
+                  background: "#EF9F27",
                   color: "#fff",
                   borderRadius: "50%",
                   fontSize: 10,

@@ -4,8 +4,9 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { buscarOUC, listarSetoresPorOUC, criarSetor, atualizarSetor } from "../api/admin";
-import type { OperacaoUrbanaOut, SetorOut, SetorIn } from "../types/api";
+import { buscarOUC, listarSetoresPorOUC, criarSetor, atualizarSetor, listarLeis, listarEstoquesLei, criarEstoqueLei } from "../api/admin";
+import type { LeiOucOut, OperacaoUrbanaOut, SetorEstoqueLeiIn, SetorEstoqueLeiOut, SetorOut, SetorIn } from "../types/api";
+import { useUser } from "../contexts/UserContext";
 
 const estilos: Record<string, React.CSSProperties> = {
   pagina: { fontFamily: "system-ui, sans-serif", minHeight: "100vh", background: "#f5f7fa" },
@@ -192,6 +193,7 @@ export default function SetoresPorOUCPage() {
   const navigate = useNavigate();
   const { oucId: oucIdStr } = useParams<{ oucId: string }>();
   const oucId = parseInt(oucIdStr ?? "0");
+  const { isDiretor } = useUser();
 
   const [ouc, setOuc] = useState<OperacaoUrbanaOut | null>(null);
   const [setores, setSetores] = useState<SetorOut[]>([]);
@@ -207,6 +209,17 @@ export default function SetoresPorOUCPage() {
   const [hoveredVoltar, setHoveredVoltar] = useState(false);
   const [hoveredNovo, setHoveredNovo] = useState(false);
 
+  // --- Estoques por Lei ---
+  const [leis, setLeis] = useState<LeiOucOut[]>([]);
+  const [leiSelecionada, setLeiSelecionada] = useState<number | "">("");
+  const [estoques, setEstoques] = useState<SetorEstoqueLeiOut[]>([]);
+  const [carregandoEstoques, setCarregandoEstoques] = useState(false);
+  const [erroEstoques, setErroEstoques] = useState("");
+  const [modalEstoqueAberto, setModalEstoqueAberto] = useState(false);
+  const [formEstoque, setFormEstoque] = useState<Partial<SetorEstoqueLeiIn>>({});
+  const [salvandoEstoque, setSalvandoEstoque] = useState(false);
+  const [erroModalEstoque, setErroModalEstoque] = useState("");
+
   const carregarSetores = useCallback(async () => {
     try {
       const data = await listarSetoresPorOUC(oucId);
@@ -220,12 +233,14 @@ export default function SetoresPorOUCPage() {
     setCarregando(true);
     setErroGeral("");
     try {
-      const [oucData, setoresData] = await Promise.all([
+      const [oucData, setoresData, leisData] = await Promise.all([
         buscarOUC(oucId),
         listarSetoresPorOUC(oucId),
+        listarLeis(oucId),
       ]);
       setOuc(oucData);
       setSetores(setoresData);
+      setLeis(leisData);
     } catch {
       setErroGeral("Erro ao carregar dados. Verifique a conexão com a API.");
     } finally {
@@ -290,6 +305,68 @@ export default function SetoresPorOUCPage() {
       }
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function carregarEstoques(leiId: number) {
+    setCarregandoEstoques(true);
+    setErroEstoques("");
+    try {
+      const data = await listarEstoquesLei({ lei_ouc_id: leiId });
+      setEstoques(data);
+    } catch {
+      setErroEstoques("Erro ao carregar estoques por lei.");
+    } finally {
+      setCarregandoEstoques(false);
+    }
+  }
+
+  async function handleLeiChange(leiId: number | "") {
+    setLeiSelecionada(leiId);
+    if (leiId !== "") {
+      await carregarEstoques(leiId);
+    } else {
+      setEstoques([]);
+    }
+  }
+
+  function abrirModalEstoque(setorId?: string) {
+    if (leiSelecionada === "") return;
+    setFormEstoque({
+      lei_ouc_id: leiSelecionada as number,
+      setor_id: setorId ?? "",
+      estoque_total_r_m2: 0,
+      estoque_total_nr_m2: 0,
+    });
+    setErroModalEstoque("");
+    setModalEstoqueAberto(true);
+  }
+
+  function fecharModalEstoque() {
+    setModalEstoqueAberto(false);
+    setErroModalEstoque("");
+  }
+
+  async function handleSalvarEstoque(e: React.FormEvent) {
+    e.preventDefault();
+    setErroModalEstoque("");
+    if (!formEstoque.setor_id) { setErroModalEstoque("Setor é obrigatório."); return; }
+    if (formEstoque.lei_ouc_id == null) { setErroModalEstoque("Lei é obrigatória."); return; }
+
+    setSalvandoEstoque(true);
+    try {
+      await criarEstoqueLei(formEstoque as SetorEstoqueLeiIn);
+      fecharModalEstoque();
+      if (leiSelecionada !== "") await carregarEstoques(leiSelecionada as number);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
+      if (axiosErr?.response?.status === 409) {
+        setErroModalEstoque("Registro de estoque já existe para este setor × lei.");
+      } else {
+        setErroModalEstoque(axiosErr?.response?.data?.detail ?? "Erro ao salvar estoque.");
+      }
+    } finally {
+      setSalvandoEstoque(false);
     }
   }
 
@@ -398,6 +475,172 @@ export default function SetoresPorOUCPage() {
           )}
         </div>
       </div>
+
+      {/* Estoques por Lei */}
+      {leis.length > 0 && (
+        <div style={{ marginTop: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#003087", margin: 0 }}>Estoques por Lei</h3>
+            <select
+              style={{ padding: "6px 10px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", minWidth: "200px" }}
+              value={leiSelecionada}
+              onChange={(e) => void handleLeiChange(e.target.value === "" ? "" : parseInt(e.target.value))}
+            >
+              <option value="">Selecione uma lei…</option>
+              {leis.map((l) => (
+                <option key={l.id} value={l.id}>{l.identificador}{l.vigente ? " (vigente)" : ""}</option>
+              ))}
+            </select>
+            {isDiretor && leiSelecionada !== "" && (
+              <button
+                style={{ padding: "6px 12px", background: "#ffd166", color: "#003087", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "13px", fontWeight: 700 }}
+                onClick={() => abrirModalEstoque()}
+              >
+                + Novo Estoque
+              </button>
+            )}
+          </div>
+
+          {leiSelecionada !== "" && (
+            <div style={{ background: "#fff", borderRadius: "8px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", overflow: "hidden" }}>
+              {carregandoEstoques ? (
+                <p style={{ ...estilos.carregando, padding: "24px" }}>Carregando estoques…</p>
+              ) : erroEstoques ? (
+                <p style={{ ...estilos.erro, margin: "16px" }}>{erroEstoques}</p>
+              ) : estoques.length === 0 ? (
+                <p style={{ padding: "24px", color: "#666", fontStyle: "italic", fontSize: "13px" }}>Nenhum estoque cadastrado para esta lei.</p>
+              ) : (
+                <table style={{ ...estilos.tabela, fontSize: "13px" }}>
+                  <thead>
+                    <tr>
+                      <th style={estilos.th}>Setor</th>
+                      <th style={estilos.th}>Estoque R (m²)</th>
+                      <th style={estilos.th}>Estoque NR (m²)</th>
+                      <th style={estilos.th}>Teto R (m²)</th>
+                      <th style={estilos.th}>Teto NR (m²)</th>
+                      <th style={estilos.th}>Reserva R (m²)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {estoques.map((est) => {
+                      const nomeSetor = setores.find((s) => s.id === est.setor_id)?.nome ?? est.setor_id;
+                      return (
+                        <tr key={est.id}>
+                          <td style={estilos.td}><strong>{nomeSetor}</strong></td>
+                          <td style={estilos.td}>{Number(est.estoque_total_r_m2).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+                          <td style={estilos.td}>{Number(est.estoque_total_nr_m2).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+                          <td style={estilos.td}>{est.teto_r_m2 ? Number(est.teto_r_m2).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}</td>
+                          <td style={estilos.td}>{est.teto_nr_m2 ? Number(est.teto_nr_m2).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}</td>
+                          <td style={estilos.td}>{est.reserva_r_m2 ? Number(est.reserva_r_m2).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal de novo estoque por lei */}
+      {modalEstoqueAberto && (
+        <div style={estilos.overlay} onClick={(e) => { if (e.target === e.currentTarget) fecharModalEstoque(); }}>
+          <div style={{ ...estilos.modal, width: "480px" }}>
+            <h2 style={estilos.modalTitulo}>Novo Estoque por Lei</h2>
+            {erroModalEstoque && <p role="alert" style={estilos.erro}>{erroModalEstoque}</p>}
+            <form onSubmit={(e) => void handleSalvarEstoque(e)} noValidate>
+              <div style={estilos.grupo}>
+                <label style={estilos.label} htmlFor="est-setor">Setor *</label>
+                <select
+                  id="est-setor"
+                  style={estilos.input}
+                  value={formEstoque.setor_id ?? ""}
+                  onChange={(e) => setFormEstoque((p) => ({ ...p, setor_id: e.target.value }))}
+                  required
+                >
+                  <option value="">Selecione…</option>
+                  {setores.filter((s) => s.setor_pai_id == null).map((s) => (
+                    <option key={s.id} value={s.id}>{s.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="est-r">Estoque Total R (m²) *</label>
+                  <input
+                    id="est-r"
+                    style={estilos.input}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={formEstoque.estoque_total_r_m2 ?? ""}
+                    onChange={(e) => setFormEstoque((p) => ({ ...p, estoque_total_r_m2: parseFloat(e.target.value) || 0 }))}
+                    required
+                  />
+                </div>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="est-nr">Estoque Total NR (m²) *</label>
+                  <input
+                    id="est-nr"
+                    style={estilos.input}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={formEstoque.estoque_total_nr_m2 ?? ""}
+                    onChange={(e) => setFormEstoque((p) => ({ ...p, estoque_total_nr_m2: parseFloat(e.target.value) || 0 }))}
+                    required
+                  />
+                </div>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="est-teto-r">Teto R (m²)</label>
+                  <input
+                    id="est-teto-r"
+                    style={estilos.input}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={formEstoque.teto_r_m2 ?? ""}
+                    onChange={(e) => setFormEstoque((p) => ({ ...p, teto_r_m2: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                  />
+                </div>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="est-teto-nr">Teto NR (m²)</label>
+                  <input
+                    id="est-teto-nr"
+                    style={estilos.input}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={formEstoque.teto_nr_m2 ?? ""}
+                    onChange={(e) => setFormEstoque((p) => ({ ...p, teto_nr_m2: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                  />
+                </div>
+              </div>
+              <div style={estilos.grupo}>
+                <label style={estilos.label} htmlFor="est-reserva-r">Reserva R (m²)</label>
+                <input
+                  id="est-reserva-r"
+                  style={estilos.input}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={formEstoque.reserva_r_m2 ?? ""}
+                  onChange={(e) => setFormEstoque((p) => ({ ...p, reserva_r_m2: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                />
+              </div>
+              <div style={estilos.botoes}>
+                <button type="button" style={estilos.botaoSecundario} onClick={fecharModalEstoque} disabled={salvandoEstoque}>
+                  Cancelar
+                </button>
+                <button type="submit" style={estilos.botaoPrimario} disabled={salvandoEstoque}>
+                  {salvandoEstoque ? "Salvando…" : "Salvar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {modalAberto && (
         <div style={estilos.overlay} onClick={(e) => { if (e.target === e.currentTarget) fecharModal(); }}>

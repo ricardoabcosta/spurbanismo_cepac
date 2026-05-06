@@ -13,8 +13,8 @@ from typing import Optional
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.engine.dtos import LimitesOucDTO, SaldoSetorDTO
-from src.core.models import Movimentacao, OperacaoUrbana, Setor, TituloCepac
+from src.core.engine.dtos import LimitesOucDTO, LimitesSetorDTO, SaldoSetorDTO
+from src.core.models import LeiOuc, Movimentacao, OperacaoUrbana, Setor, SetorEstoqueLei, TituloCepac
 from src.core.models.enums import EstadoTituloEnum, UsoEnum
 
 
@@ -132,6 +132,92 @@ async def calcular_saldo(
     )
 
 
+async def get_limites_setor(
+    session: AsyncSession,
+    setor_nome: str,
+    lei_vigente: Optional[str] = None,
+) -> LimitesSetorDTO:
+    """
+    Retorna os limites estruturais de um setor.
+
+    Se `lei_vigente` for informado, busca em `setor_estoque_lei` via join
+    com `lei_ouc`. Caso contrário, usa os campos denormalizados de `setor.*`
+    (backward compatibility).
+
+    O parâmetro `lei_vigente` é o identificador da lei (ex: "18.175/2024").
+    Quando informado, localiza a lei vigente correspondente à OUC do setor
+    e lê os estoques da tabela `setor_estoque_lei`.
+    """
+    if lei_vigente is not None:
+        # Buscar via setor_estoque_lei — multi-lei
+        stmt = (
+            select(
+                SetorEstoqueLei.estoque_total_r_m2,
+                SetorEstoqueLei.estoque_total_nr_m2,
+                SetorEstoqueLei.teto_r_m2,
+                SetorEstoqueLei.teto_nr_m2,
+                SetorEstoqueLei.reserva_r_m2,
+                Setor.estoque_total_m2,
+                Setor.bloqueio_nr,
+                Setor.piso_r_percentual,
+            )
+            .join(Setor, Setor.id == SetorEstoqueLei.setor_id)
+            .join(LeiOuc, LeiOuc.id == SetorEstoqueLei.lei_ouc_id)
+            .where(
+                Setor.nome == setor_nome,
+                LeiOuc.identificador == lei_vigente,
+            )
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        row = result.one_or_none()
+        if row is not None:
+            estoque_total = row.estoque_total_m2
+            teto_nr = row.teto_nr_m2 or Decimal("0")
+            teto_r = row.teto_r_m2
+            reserva_r = row.reserva_r_m2
+            piso_r = row.piso_r_percentual
+            return LimitesSetorDTO(
+                estoque_total_m2=Decimal(str(estoque_total)),
+                teto_nr_m2=Decimal(str(teto_nr)),
+                teto_r_m2=Decimal(str(teto_r)) if teto_r is not None else None,
+                reserva_r_m2=Decimal(str(reserva_r)) if reserva_r is not None else None,
+                piso_r_percentual=Decimal(str(piso_r)) if piso_r is not None else None,
+                bloqueio_nr=row.bloqueio_nr,
+            )
+
+    # Fallback: usar campos denormalizados de setor.*
+    stmt = (
+        select(
+            Setor.estoque_total_m2,
+            Setor.teto_nr_m2,
+            Setor.teto_r_m2,
+            Setor.reserva_r_m2,
+            Setor.piso_r_percentual,
+            Setor.bloqueio_nr,
+        )
+        .where(Setor.nome == setor_nome)
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    row = result.one_or_none()
+    if row is None:
+        return LimitesSetorDTO(
+            estoque_total_m2=Decimal("0"),
+            teto_nr_m2=Decimal("0"),
+            bloqueio_nr=False,
+        )
+
+    return LimitesSetorDTO(
+        estoque_total_m2=Decimal(str(row.estoque_total_m2)),
+        teto_nr_m2=Decimal(str(row.teto_nr_m2)),
+        teto_r_m2=Decimal(str(row.teto_r_m2)) if row.teto_r_m2 is not None else None,
+        reserva_r_m2=Decimal(str(row.reserva_r_m2)) if row.reserva_r_m2 is not None else None,
+        piso_r_percentual=Decimal(str(row.piso_r_percentual)) if row.piso_r_percentual is not None else None,
+        bloqueio_nr=row.bloqueio_nr,
+    )
+
+
 async def get_limites_ouc(
     session: AsyncSession,
     setor_nome: str,
@@ -141,13 +227,18 @@ async def get_limites_ouc(
 
     Calcula também o total de R Não Incentivado (incentivado=FALSE) já
     consumido/em análise em todos os setores da mesma OUC.
+    Também retorna a capacidade global da operação (CAPACIDADE_TOTAL - RESERVA_TECNICA).
 
     Para OUCs sem distinção R Inc/NI, teto_r_nao_incentivado_m2 é None
     e r_nao_inc_consumido_global é 0 — o validator faz no-op automaticamente.
     """
-    # Busca o teto da OUC via setor
+    # Busca parâmetros da OUC via setor
     stmt_ouc = (
-        select(OperacaoUrbana.teto_r_nao_incentivado_m2, OperacaoUrbana.id)
+        select(
+            OperacaoUrbana.teto_r_nao_incentivado_m2,
+            OperacaoUrbana.id,
+            OperacaoUrbana.reserva_tecnica_m2,
+        )
         .join(Setor, Setor.operacao_urbana_id == OperacaoUrbana.id)
         .where(Setor.nome == setor_nome)
         .limit(1)
@@ -155,34 +246,53 @@ async def get_limites_ouc(
     result_ouc = await session.execute(stmt_ouc)
     row_ouc = result_ouc.one_or_none()
 
-    if row_ouc is None or row_ouc[0] is None:
+    if row_ouc is None:
         return LimitesOucDTO(
             teto_r_nao_incentivado_m2=None,
             r_nao_inc_consumido_global=Decimal("0"),
         )
 
-    teto = Decimal(str(row_ouc[0]))
-    ouc_id: int = row_ouc[1]
+    ouc_id: int = row_ouc.id
+    teto_ni = None
+    capacidade_global = Decimal("4850000.00") - Decimal("250000.00")  # default OUCAE
+
+    # Tentar ler capacidade_global de lei_ouc.estoque_geral_m2 se disponível
+    get_cap = await session.execute(
+        select(LeiOuc.estoque_geral_m2).where(
+            LeiOuc.operacao_urbana_id == ouc_id,
+            LeiOuc.vigente.is_(True),
+        ).limit(1)
+    )
+    cap_row = get_cap.scalar_one_or_none()
+    if cap_row is not None:
+        capacidade_global = Decimal(str(cap_row))
+
+    # teto R Não Incentivado
+    if row_ouc.teto_r_nao_incentivado_m2 is not None:
+        teto_ni = Decimal(str(row_ouc.teto_r_nao_incentivado_m2))
 
     # Soma R Não Incentivado (incentivado=FALSE) consumido/em análise na OUC inteira
-    stmt_consumido = (
-        select(func.sum(TituloCepac.valor_m2).label("total_ni"))
-        .select_from(Movimentacao)
-        .join(TituloCepac, TituloCepac.id == Movimentacao.titulo_id)
-        .join(Setor, Setor.id == Movimentacao.setor_id)
-        .where(
-            Setor.operacao_urbana_id == ouc_id,
-            Movimentacao.uso == UsoEnum.R,
-            Movimentacao.incentivado.is_(False),
-            Movimentacao.estado_novo.in_(
-                [EstadoTituloEnum.CONSUMIDO, EstadoTituloEnum.EM_ANALISE]
-            ),
+    r_nao_inc_consumido = Decimal("0")
+    if teto_ni is not None:
+        stmt_consumido = (
+            select(func.sum(TituloCepac.valor_m2).label("total_ni"))
+            .select_from(Movimentacao)
+            .join(TituloCepac, TituloCepac.id == Movimentacao.titulo_id)
+            .join(Setor, Setor.id == Movimentacao.setor_id)
+            .where(
+                Setor.operacao_urbana_id == ouc_id,
+                Movimentacao.uso == UsoEnum.R,
+                Movimentacao.incentivado.is_(False),
+                Movimentacao.estado_novo.in_(
+                    [EstadoTituloEnum.CONSUMIDO, EstadoTituloEnum.EM_ANALISE]
+                ),
+            )
         )
-    )
-    result_consumido = await session.execute(stmt_consumido)
-    consumido = result_consumido.scalar() or Decimal("0")
+        result_consumido = await session.execute(stmt_consumido)
+        r_nao_inc_consumido = Decimal(str(result_consumido.scalar() or "0"))
 
     return LimitesOucDTO(
-        teto_r_nao_incentivado_m2=teto,
-        r_nao_inc_consumido_global=Decimal(str(consumido)),
+        teto_r_nao_incentivado_m2=teto_ni,
+        r_nao_inc_consumido_global=r_nao_inc_consumido,
+        capacidade_global_m2=capacidade_global,
     )

@@ -30,7 +30,7 @@ from src.core.models.configuracao_operacao import ConfiguracaoOperacao
 from src.core.models.medicao_obra import MedicaoObra
 from src.core.models.parametro_sistema import ParametroSistema
 from src.core.models.setor import Setor
-from src.core.repositories import saldo_repository
+from src.core.repositories import saldo_repository as sr
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ async def calcular_ocupacao_setores(
     resultado: list[OcupacaoSetorDTO] = []
 
     for setor in setores:
-        saldo = await saldo_repository.calcular_saldo(session, setor.nome, data_ref)
+        saldo = await sr.calcular_saldo(session, setor.nome, data_ref)
 
         consumido_r_aca = saldo.r_consumido_aca
         consumido_nr_aca = saldo.nr_consumido_aca

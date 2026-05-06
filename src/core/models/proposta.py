@@ -76,6 +76,15 @@ class Proposta(Base):
     # Preenchido quando certidão de alteração tem área diferente — D7
     observacao_alteracao: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # --- Lei vigente aplicável (multi-lei OUCFL) — migration 028 ---
+    lei_vigente: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    # --- ACA Real vs Benefícios (OUCFL Lei 18.175/2024) — migration 028 ---
+    aca_r_real_m2: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_r_beneficios_m2: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_nr_real_m2: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_nr_beneficios_m2: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+
     # --- Campos migration 012 ---
 
     # Datas e classificação do interessado

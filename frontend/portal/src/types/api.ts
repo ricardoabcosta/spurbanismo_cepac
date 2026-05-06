@@ -311,6 +311,73 @@ export interface SetorBasico {
 }
 
 // ---------------------------------------------------------------------------
+// Lei OUC (admin)
+// ---------------------------------------------------------------------------
+
+export interface LeiOucOut {
+  id: number;
+  operacao_urbana_id: number;
+  identificador: string;
+  nome: string | null;
+  data_vigencia_inicio: string | null;
+  data_vigencia_fim: string | null;
+  ordem: number;
+  vigente: boolean;
+  consumo_historico_r_m2: string | null;
+  consumo_historico_nr_m2: string | null;
+  estoque_geral_m2: string | null;
+}
+
+export interface LeiOucIn {
+  operacao_urbana_id: number;
+  identificador: string;
+  nome?: string | null;
+  data_vigencia_inicio?: string | null;
+  data_vigencia_fim?: string | null;
+  ordem: number;
+  vigente: boolean;
+  consumo_historico_r_m2?: number | null;
+  consumo_historico_nr_m2?: number | null;
+  estoque_geral_m2?: number | null;
+}
+
+export interface LeiOucUpdate {
+  nome?: string | null;
+  data_vigencia_inicio?: string | null;
+  data_vigencia_fim?: string | null;
+  ordem?: number;
+  vigente?: boolean;
+  consumo_historico_r_m2?: number | null;
+  consumo_historico_nr_m2?: number | null;
+  estoque_geral_m2?: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Estoque por Setor × Lei (admin)
+// ---------------------------------------------------------------------------
+
+export interface SetorEstoqueLeiOut {
+  id: number;
+  setor_id: string;
+  lei_ouc_id: number;
+  estoque_total_r_m2: string;
+  estoque_total_nr_m2: string;
+  teto_r_m2: string | null;
+  teto_nr_m2: string | null;
+  reserva_r_m2: string | null;
+}
+
+export interface SetorEstoqueLeiIn {
+  setor_id: string;
+  lei_ouc_id: number;
+  estoque_total_r_m2: number;
+  estoque_total_nr_m2: number;
+  teto_r_m2?: number | null;
+  teto_nr_m2?: number | null;
+  reserva_r_m2?: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // Operação Urbana (admin)
 // ---------------------------------------------------------------------------
 

@@ -77,6 +77,11 @@ MIGRATION_ORDER = [
     "022_ouc_teto_r_nao_incentivado.sql",
     "023_incentivado_flag.sql",
     "024_operacao_urbana_config_fields.sql",
+    "025_lei_ouc_estoque.sql",
+    "026_seed_lei_ouc.sql",
+    "027_seed_setor_estoque_lei.sql",
+    "028_proposta_lei_beneficios.sql",
+    "029_ampliar_interessado.sql",
 ]
 
 

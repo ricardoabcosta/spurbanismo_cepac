@@ -30,16 +30,23 @@ from src.api.schemas.admin import (
     AtivoUpdate,
     ConfiguracaoIn,
     ConfiguracaoOut,
+    LeiOucIn,
+    LeiOucOut,
+    LeiOucUpdate,
     OperacaoUrbanaIn,
     OperacaoUrbanaOut,
     PapelUpdate,
+    SetorEstoqueLeiIn,
+    SetorEstoqueLeiOut,
     SetorIn,
     SetorOut,
     UsuarioOut,
 )
 from src.core.models.configuracao_operacao import ConfiguracaoOperacao
+from src.core.models.lei_ouc import LeiOuc
 from src.core.models.operacao_urbana import OperacaoUrbana
 from src.core.models.setor import Setor
+from src.core.models.setor_estoque_lei import SetorEstoqueLei
 from src.core.models.usuario import Usuario
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -450,3 +457,152 @@ async def alterar_ativo(
     await session.commit()
     await session.refresh(usuario)
     return UsuarioOut.model_validate(usuario)
+
+
+# ---------------------------------------------------------------------------
+# Leis OUC — catálogo cronológico de leis por operação urbana
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/leis",
+    response_model=list[LeiOucOut],
+    summary="Listar leis cadastradas, opcionalmente filtradas por OUC",
+)
+async def listar_leis(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    operacao_urbana_id: Annotated[
+        Optional[int], Query(description="Filtrar por ID da Operação Urbana")
+    ] = None,
+) -> list[LeiOucOut]:
+    stmt = select(LeiOuc)
+    if operacao_urbana_id is not None:
+        stmt = stmt.where(LeiOuc.operacao_urbana_id == operacao_urbana_id)
+    stmt = stmt.order_by(LeiOuc.operacao_urbana_id, LeiOuc.ordem)
+    result = await session.execute(stmt)
+    leis = result.scalars().all()
+    return [LeiOucOut.model_validate(l) for l in leis]
+
+
+@router.post(
+    "/leis",
+    response_model=LeiOucOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Criar lei",
+)
+async def criar_lei(
+    payload: LeiOucIn,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> LeiOucOut:
+    # Validar OUC
+    ouc_result = await session.execute(
+        select(OperacaoUrbana).where(OperacaoUrbana.id == payload.operacao_urbana_id)
+    )
+    if ouc_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Operação Urbana não encontrada.",
+        )
+    # Validar unicidade
+    existente = await session.execute(
+        select(LeiOuc).where(
+            LeiOuc.operacao_urbana_id == payload.operacao_urbana_id,
+            LeiOuc.identificador == payload.identificador,
+        )
+    )
+    if existente.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Lei '{payload.identificador}' já existe nesta OUC.",
+        )
+    lei = LeiOuc(**payload.model_dump())
+    session.add(lei)
+    await session.flush()
+    await session.commit()
+    await session.refresh(lei)
+    return LeiOucOut.model_validate(lei)
+
+
+@router.put(
+    "/leis/{lei_id}",
+    response_model=LeiOucOut,
+    summary="Atualizar lei",
+)
+async def atualizar_lei(
+    lei_id: int,
+    payload: LeiOucUpdate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> LeiOucOut:
+    result = await session.execute(select(LeiOuc).where(LeiOuc.id == lei_id))
+    lei = result.scalar_one_or_none()
+    if lei is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lei não encontrada.")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(lei, field, value)
+
+    await session.commit()
+    await session.refresh(lei)
+    return LeiOucOut.model_validate(lei)
+
+
+# ---------------------------------------------------------------------------
+# Estoque por setor × lei (SetorEstoqueLei)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/estoques-lei",
+    response_model=list[SetorEstoqueLeiOut],
+    summary="Listar estoques por setor × lei",
+)
+async def listar_estoques_lei(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+    lei_ouc_id: Annotated[
+        Optional[int], Query(description="Filtrar por ID da lei")
+    ] = None,
+    setor_id: Annotated[
+        Optional[UUID], Query(description="Filtrar por ID do setor (UUID)")
+    ] = None,
+) -> list[SetorEstoqueLeiOut]:
+    stmt = select(SetorEstoqueLei)
+    if lei_ouc_id is not None:
+        stmt = stmt.where(SetorEstoqueLei.lei_ouc_id == lei_ouc_id)
+    if setor_id is not None:
+        stmt = stmt.where(SetorEstoqueLei.setor_id == setor_id)
+    stmt = stmt.order_by(SetorEstoqueLei.lei_ouc_id, SetorEstoqueLei.id)
+    result = await session.execute(stmt)
+    registros = result.scalars().all()
+    return [SetorEstoqueLeiOut.model_validate(r) for r in registros]
+
+
+@router.post(
+    "/estoques-lei",
+    response_model=SetorEstoqueLeiOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Criar registro de estoque por lei",
+)
+async def criar_estoque_lei(
+    payload: SetorEstoqueLeiIn,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[UsuarioAutenticado, Depends(require_diretor)],
+) -> SetorEstoqueLeiOut:
+    existente = await session.execute(
+        select(SetorEstoqueLei).where(
+            SetorEstoqueLei.setor_id == payload.setor_id,
+            SetorEstoqueLei.lei_ouc_id == payload.lei_ouc_id,
+        )
+    )
+    if existente.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Registro de estoque já existe para este setor × lei.",
+        )
+    registro = SetorEstoqueLei(**payload.model_dump())
+    session.add(registro)
+    await session.flush()
+    await session.commit()
+    await session.refresh(registro)
+    return SetorEstoqueLeiOut.model_validate(registro)

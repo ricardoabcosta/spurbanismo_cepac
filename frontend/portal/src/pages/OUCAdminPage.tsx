@@ -4,8 +4,8 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { listarOUCs, criarOUC, atualizarOUC } from "../api/admin";
-import type { OperacaoUrbanaOut, OperacaoUrbanaIn } from "../types/api";
+import { listarOUCs, criarOUC, atualizarOUC, listarLeis, criarLei, atualizarLei } from "../api/admin";
+import type { LeiOucIn, LeiOucOut, OperacaoUrbanaOut, OperacaoUrbanaIn } from "../types/api";
 import { useUser } from "../contexts/UserContext";
 
 const estilos: Record<string, React.CSSProperties> = {
@@ -163,6 +163,17 @@ export default function OUCAdminPage() {
   const [hoveredVoltar, setHoveredVoltar] = useState(false);
   const [hoveredNovo, setHoveredNovo] = useState(false);
 
+  // --- Modal de leis ---
+  const [leisPanelOuc, setLeisPanelOuc] = useState<OperacaoUrbanaOut | null>(null);
+  const [leis, setLeis] = useState<LeiOucOut[]>([]);
+  const [carregandoLeis, setCarregandoLeis] = useState(false);
+  const [erroLeis, setErroLeis] = useState("");
+  const [modalLeiAberto, setModalLeiAberto] = useState(false);
+  const [editandoLei, setEditandoLei] = useState<LeiOucOut | null>(null);
+  const [formLei, setFormLei] = useState<Partial<LeiOucIn>>({});
+  const [salvandoLei, setSalvandoLei] = useState(false);
+  const [erroModalLei, setErroModalLei] = useState("");
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     setErroGeral("");
@@ -228,6 +239,98 @@ export default function OUCAdminPage() {
       }
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function abrirPainelLeis(o: OperacaoUrbanaOut) {
+    setLeisPanelOuc(o);
+    setErroLeis("");
+    setCarregandoLeis(true);
+    try {
+      const data = await listarLeis(o.id);
+      setLeis(data);
+    } catch {
+      setErroLeis("Erro ao carregar leis.");
+    } finally {
+      setCarregandoLeis(false);
+    }
+  }
+
+  function fecharPainelLeis() {
+    setLeisPanelOuc(null);
+    setLeis([]);
+    setErroLeis("");
+    setModalLeiAberto(false);
+    setEditandoLei(null);
+  }
+
+  function abrirNovaLei() {
+    if (!leisPanelOuc) return;
+    setEditandoLei(null);
+    setFormLei({ operacao_urbana_id: leisPanelOuc.id, vigente: false, ordem: leis.length + 1 });
+    setErroModalLei("");
+    setModalLeiAberto(true);
+  }
+
+  function abrirEdicaoLei(l: LeiOucOut) {
+    setEditandoLei(l);
+    setFormLei({
+      nome: l.nome ?? "",
+      identificador: l.identificador,
+      data_vigencia_inicio: l.data_vigencia_inicio ?? "",
+      data_vigencia_fim: l.data_vigencia_fim ?? "",
+      ordem: l.ordem,
+      vigente: l.vigente,
+      consumo_historico_r_m2: l.consumo_historico_r_m2 ? Number(l.consumo_historico_r_m2) : undefined,
+      consumo_historico_nr_m2: l.consumo_historico_nr_m2 ? Number(l.consumo_historico_nr_m2) : undefined,
+      estoque_geral_m2: l.estoque_geral_m2 ? Number(l.estoque_geral_m2) : undefined,
+    });
+    setErroModalLei("");
+    setModalLeiAberto(true);
+  }
+
+  function fecharModalLei() {
+    setModalLeiAberto(false);
+    setEditandoLei(null);
+    setErroModalLei("");
+  }
+
+  async function handleSalvarLei(e: React.FormEvent) {
+    e.preventDefault();
+    setErroModalLei("");
+    if (!formLei.identificador?.trim()) { setErroModalLei("Identificador é obrigatório."); return; }
+    if (!formLei.ordem || formLei.ordem < 1) { setErroModalLei("Ordem deve ser maior que zero."); return; }
+
+    setSalvandoLei(true);
+    try {
+      if (editandoLei) {
+        await atualizarLei(editandoLei.id, {
+          nome: formLei.nome || null,
+          data_vigencia_inicio: formLei.data_vigencia_inicio || null,
+          data_vigencia_fim: formLei.data_vigencia_fim || null,
+          ordem: formLei.ordem,
+          vigente: formLei.vigente,
+          consumo_historico_r_m2: formLei.consumo_historico_r_m2 ?? null,
+          consumo_historico_nr_m2: formLei.consumo_historico_nr_m2 ?? null,
+          estoque_geral_m2: formLei.estoque_geral_m2 ?? null,
+        });
+      } else {
+        await criarLei(formLei as LeiOucIn);
+      }
+      fecharModalLei();
+      if (leisPanelOuc) {
+        const data = await listarLeis(leisPanelOuc.id);
+        setLeis(data);
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
+      if (axiosErr?.response?.status === 409) {
+        setErroModalLei("Lei com este identificador já existe nesta OUC.");
+      } else {
+        setErroModalLei(axiosErr?.response?.data?.detail ?? "Erro ao salvar lei.");
+      }
+    } finally {
+      setSalvandoLei(false);
     }
   }
 
@@ -310,6 +413,12 @@ export default function OUCAdminPage() {
                           >
                             Setores
                           </button>
+                          <button
+                            style={{ padding: "5px 12px", background: "#1a7a2e", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}
+                            onClick={() => void abrirPainelLeis(o)}
+                          >
+                            Leis
+                          </button>
                           {isDiretor && (
                             <button style={estilos.botaoEditar} onClick={() => abrirEdicao(o)}>
                               Editar
@@ -325,6 +434,225 @@ export default function OUCAdminPage() {
           )}
         </div>
       </div>
+
+      {/* Painel lateral — Histórico de Leis */}
+      {leisPanelOuc && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-start", justifyContent: "flex-end", zIndex: 900 }} onClick={(e) => { if (e.target === e.currentTarget) fecharPainelLeis(); }}>
+          <div style={{ background: "#fff", width: "640px", maxWidth: "92vw", height: "100vh", overflowY: "auto", padding: "28px 24px", boxShadow: "-4px 0 24px rgba(0,0,0,0.18)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#003087", margin: 0 }}>
+                Leis — {leisPanelOuc.sigla}
+              </h2>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {isDiretor && (
+                  <button
+                    style={{ padding: "7px 14px", background: "#ffd166", color: "#003087", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "13px", fontWeight: 700 }}
+                    onClick={abrirNovaLei}
+                  >
+                    + Nova Lei
+                  </button>
+                )}
+                <button
+                  style={{ padding: "7px 14px", background: "#f5f5f5", color: "#333", border: "1px solid #ccc", borderRadius: "4px", cursor: "pointer", fontSize: "13px" }}
+                  onClick={fecharPainelLeis}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+
+            {erroLeis && <p style={estilos.erro}>{erroLeis}</p>}
+
+            {carregandoLeis ? (
+              <p style={estilos.carregando}>Carregando leis…</p>
+            ) : leis.length === 0 ? (
+              <p style={{ color: "#666", fontStyle: "italic", fontSize: "13px" }}>Nenhuma lei cadastrada para esta OUC.</p>
+            ) : (
+              <table style={{ ...estilos.tabela, fontSize: "12px" }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...estilos.th, padding: "8px 10px" }}>Ordem</th>
+                    <th style={{ ...estilos.th, padding: "8px 10px" }}>Identificador</th>
+                    <th style={{ ...estilos.th, padding: "8px 10px" }}>Nome</th>
+                    <th style={{ ...estilos.th, padding: "8px 10px" }}>Vigência</th>
+                    <th style={{ ...estilos.th, padding: "8px 10px" }}>Vigente</th>
+                    <th style={{ ...estilos.th, padding: "8px 10px" }}>Consumo R (m²)</th>
+                    <th style={{ ...estilos.th, padding: "8px 10px" }}>Consumo NR (m²)</th>
+                    {isDiretor && <th style={{ ...estilos.th, padding: "8px 10px" }}></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {leis.map((l) => (
+                    <tr key={l.id}>
+                      <td style={{ ...estilos.td, padding: "7px 10px" }}>{l.ordem}</td>
+                      <td style={{ ...estilos.td, padding: "7px 10px" }}><strong>{l.identificador}</strong></td>
+                      <td style={{ ...estilos.td, padding: "7px 10px" }}>{l.nome ?? "—"}</td>
+                      <td style={{ ...estilos.td, padding: "7px 10px", whiteSpace: "nowrap" }}>
+                        {l.data_vigencia_inicio ?? "—"}{l.data_vigencia_fim ? ` → ${l.data_vigencia_fim}` : l.data_vigencia_inicio ? " → atual" : ""}
+                      </td>
+                      <td style={{ ...estilos.td, padding: "7px 10px" }}>
+                        <span style={{ ...estilos.badge, ...(l.vigente ? estilos.badgeSim : estilos.badgeNao) }}>
+                          {l.vigente ? "Sim" : "Não"}
+                        </span>
+                      </td>
+                      <td style={{ ...estilos.td, padding: "7px 10px" }}>
+                        {l.consumo_historico_r_m2 ? Number(l.consumo_historico_r_m2).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}
+                      </td>
+                      <td style={{ ...estilos.td, padding: "7px 10px" }}>
+                        {l.consumo_historico_nr_m2 ? Number(l.consumo_historico_nr_m2).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}
+                      </td>
+                      {isDiretor && (
+                        <td style={{ ...estilos.td, padding: "7px 10px" }}>
+                          <button style={estilos.botaoEditar} onClick={() => abrirEdicaoLei(l)}>Editar</button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de criação/edição de lei */}
+      {modalLeiAberto && (
+        <div style={{ ...estilos.overlay, zIndex: 1100 }} onClick={(e) => { if (e.target === e.currentTarget) fecharModalLei(); }}>
+          <div style={{ ...estilos.modal, width: "520px" }}>
+            <h2 style={estilos.modalTitulo}>{editandoLei ? "Editar Lei" : "Nova Lei"}</h2>
+            {erroModalLei && <p role="alert" style={estilos.erro}>{erroModalLei}</p>}
+            <form onSubmit={(e) => void handleSalvarLei(e)} noValidate>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="lei-id">Identificador *</label>
+                  <input
+                    id="lei-id"
+                    style={estilos.input}
+                    value={formLei.identificador ?? ""}
+                    onChange={(e) => setFormLei((p) => ({ ...p, identificador: e.target.value }))}
+                    placeholder="ex: 18.175/2024"
+                    maxLength={30}
+                    disabled={!!editandoLei}
+                    required
+                  />
+                </div>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="lei-ordem">Ordem *</label>
+                  <input
+                    id="lei-ordem"
+                    style={estilos.input}
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={formLei.ordem ?? ""}
+                    onChange={(e) => setFormLei((p) => ({ ...p, ordem: parseInt(e.target.value) || 1 }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={estilos.grupo}>
+                <label style={estilos.label} htmlFor="lei-nome">Nome</label>
+                <input
+                  id="lei-nome"
+                  style={estilos.input}
+                  value={formLei.nome ?? ""}
+                  onChange={(e) => setFormLei((p) => ({ ...p, nome: e.target.value }))}
+                  placeholder="ex: Lei de Revisão da OUCFL"
+                  maxLength={150}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="lei-inicio">Início Vigência</label>
+                  <input
+                    id="lei-inicio"
+                    style={estilos.input}
+                    type="date"
+                    value={formLei.data_vigencia_inicio ?? ""}
+                    onChange={(e) => setFormLei((p) => ({ ...p, data_vigencia_inicio: e.target.value || null }))}
+                  />
+                </div>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="lei-fim">Fim Vigência</label>
+                  <input
+                    id="lei-fim"
+                    style={estilos.input}
+                    type="date"
+                    value={formLei.data_vigencia_fim ?? ""}
+                    onChange={(e) => setFormLei((p) => ({ ...p, data_vigencia_fim: e.target.value || null }))}
+                  />
+                  <p style={estilos.hint}>Deixe em branco para lei atual</p>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="lei-cons-r">Consumo Histórico R (m²)</label>
+                  <input
+                    id="lei-cons-r"
+                    style={estilos.input}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={formLei.consumo_historico_r_m2 ?? ""}
+                    onChange={(e) => setFormLei((p) => ({ ...p, consumo_historico_r_m2: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                    placeholder="ex: 646099.80"
+                  />
+                  <p style={estilos.hint}>Apenas leis encerradas</p>
+                </div>
+                <div style={estilos.grupo}>
+                  <label style={estilos.label} htmlFor="lei-cons-nr">Consumo Histórico NR (m²)</label>
+                  <input
+                    id="lei-cons-nr"
+                    style={estilos.input}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={formLei.consumo_historico_nr_m2 ?? ""}
+                    onChange={(e) => setFormLei((p) => ({ ...p, consumo_historico_nr_m2: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                    placeholder="ex: 426934.24"
+                  />
+                </div>
+              </div>
+
+              <div style={estilos.grupo}>
+                <label style={estilos.label} htmlFor="lei-estoque-geral">Estoque Geral (m²)</label>
+                <input
+                  id="lei-estoque-geral"
+                  style={estilos.input}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={formLei.estoque_geral_m2 ?? ""}
+                  onChange={(e) => setFormLei((p) => ({ ...p, estoque_geral_m2: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                  placeholder="ex: 1756155.00"
+                />
+                <p style={estilos.hint}>Capacidade máxima de CEPAC sob esta lei</p>
+              </div>
+
+              <label style={{ ...estilos.checkboxLinha, marginBottom: "16px" }}>
+                <input
+                  type="checkbox"
+                  checked={formLei.vigente ?? false}
+                  onChange={(e) => setFormLei((p) => ({ ...p, vigente: e.target.checked }))}
+                />
+                Lei vigente (atual)
+              </label>
+
+              <div style={estilos.botoes}>
+                <button type="button" style={estilos.botaoSecundario} onClick={fecharModalLei} disabled={salvandoLei}>
+                  Cancelar
+                </button>
+                <button type="submit" style={estilos.botaoPrimario} disabled={salvandoLei}>
+                  {salvandoLei ? "Salvando…" : "Salvar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {modalAberto && (
         <div style={estilos.overlay} onClick={(e) => { if (e.target === e.currentTarget) fecharModal(); }}>

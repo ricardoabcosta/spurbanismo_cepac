@@ -58,7 +58,9 @@ class OperacaoUrbana(Base):
     setores: Mapped[list["Setor"]] = relationship(
         "Setor", back_populates="operacao_urbana", lazy="select"
     )
-
+    leis: Mapped[list["LeiOuc"]] = relationship(
+        "LeiOuc", back_populates="operacao_urbana", lazy="select"
+    )
     def __repr__(self) -> str:
         return (
             f"<OperacaoUrbana id={self.id} sigla={self.sigla!r} "

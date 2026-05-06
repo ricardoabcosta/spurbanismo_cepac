@@ -2,7 +2,7 @@
  * Funções tipadas para os endpoints administrativos (/admin).
  */
 import apiClient from "./client";
-import type { ConfiguracaoIn, ConfiguracaoOperacao, OperacaoUrbanaIn, OperacaoUrbanaOut, PapelUsuario, SetorIn, SetorOut, UsuarioOut } from "../types/api";
+import type { ConfiguracaoIn, ConfiguracaoOperacao, LeiOucIn, LeiOucOut, LeiOucUpdate, OperacaoUrbanaIn, OperacaoUrbanaOut, PapelUsuario, SetorEstoqueLeiIn, SetorEstoqueLeiOut, SetorIn, SetorOut, UsuarioOut } from "../types/api";
 
 export async function listarSetores(): Promise<SetorOut[]> {
   const { data } = await apiClient.get<SetorOut[]>("/admin/setores");
@@ -76,5 +76,37 @@ export async function atualizarOUC(id: number, payload: OperacaoUrbanaIn): Promi
 
 export async function listarSetoresPorOUC(oucId: number): Promise<SetorOut[]> {
   const { data } = await apiClient.get<SetorOut[]>(`/admin/operacoes-urbanas/${oucId}/setores`);
+  return data;
+}
+
+export async function listarLeis(operacaoUrbanaId?: number): Promise<LeiOucOut[]> {
+  const params = new URLSearchParams();
+  if (operacaoUrbanaId !== undefined) params.set("operacao_urbana_id", String(operacaoUrbanaId));
+  const query = params.toString();
+  const { data } = await apiClient.get<LeiOucOut[]>(`/admin/leis${query ? `?${query}` : ""}`);
+  return data;
+}
+
+export async function criarLei(payload: LeiOucIn): Promise<LeiOucOut> {
+  const { data } = await apiClient.post<LeiOucOut>("/admin/leis", payload);
+  return data;
+}
+
+export async function atualizarLei(leiId: number, payload: LeiOucUpdate): Promise<LeiOucOut> {
+  const { data } = await apiClient.put<LeiOucOut>(`/admin/leis/${leiId}`, payload);
+  return data;
+}
+
+export async function listarEstoquesLei(params: { lei_ouc_id?: number; setor_id?: string }): Promise<SetorEstoqueLeiOut[]> {
+  const qs = new URLSearchParams();
+  if (params.lei_ouc_id !== undefined) qs.set("lei_ouc_id", String(params.lei_ouc_id));
+  if (params.setor_id !== undefined) qs.set("setor_id", params.setor_id);
+  const query = qs.toString();
+  const { data } = await apiClient.get<SetorEstoqueLeiOut[]>(`/admin/estoques-lei${query ? `?${query}` : ""}`);
+  return data;
+}
+
+export async function criarEstoqueLei(payload: SetorEstoqueLeiIn): Promise<SetorEstoqueLeiOut> {
+  const { data } = await apiClient.post<SetorEstoqueLeiOut>("/admin/estoques-lei", payload);
   return data;
 }

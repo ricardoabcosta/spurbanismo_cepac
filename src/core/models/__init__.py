@@ -43,6 +43,10 @@ from .operacao_urbana import OperacaoUrbana
 # Config global
 from .configuracao_operacao import ConfiguracaoOperacao
 
+# Modelo — Lei OUC e Estoque por Lei (Fase 3 — multi-lei)
+from .lei_ouc import LeiOuc
+from .setor_estoque_lei import SetorEstoqueLei
+
 # Modelos — Fase 2
 from .certidao import Certidao
 from .documento_processo import DocumentoProcesso
@@ -74,6 +78,9 @@ __all__ = [
     "Movimentacao",
     # Modelo independente
     "OperacaoUrbana",
+    # Modelos — Fase 3 (multi-lei)
+    "LeiOuc",
+    "SetorEstoqueLei",
     # Modelos — Fase 2 (ordem topológica das dependências)
     "Usuario",
     "Proposta",

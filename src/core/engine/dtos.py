@@ -51,6 +51,30 @@ class SaldoSetorDTO:
 
 
 @dataclass(frozen=True)
+class LimitesSetorDTO:
+    """
+    Limites estruturais de um setor (lidos de setor_estoque_lei ou setor.*).
+
+    Quando o setor está sob uma lei específica (multi-lei), os valores vêm
+    de setor_estoque_lei para a lei vigente. Caso contrário, vêm de setor.*
+    (backward compatibility).
+
+    - estoque_total_m2:        estoque total do setor (R + NR)
+    - teto_nr_m2:              teto máximo de NR
+    - teto_r_m2:               teto máximo de R (quando aplicável)
+    - reserva_r_m2:            reserva de R protegida (NR não pode invadir)
+    - piso_r_percentual:       percentual mínimo de R (ex: 30% Marginal Pinheiros)
+    - bloqueio_nr:             bloqueio incondicional de NR (ex: Berrini)
+    """
+    estoque_total_m2: Decimal
+    teto_nr_m2: Decimal
+    teto_r_m2: Optional[Decimal] = None
+    reserva_r_m2: Optional[Decimal] = None
+    piso_r_percentual: Optional[Decimal] = None
+    bloqueio_nr: bool = False
+
+
+@dataclass(frozen=True)
 class LimitesOucDTO:
     """
     Parâmetros de limite da OUC onde o setor está inserido.
@@ -61,9 +85,13 @@ class LimitesOucDTO:
     teto_r_nao_incentivado_m2: None → OUC sem distinção (OUCAE, OUCFL).
     r_nao_inc_consumido_global: total de R Não Incentivado já consumido/em análise
                                  em todos os setores da OUC.
+
+    capacidade_global_m2:       capacidade máxima da OUC (CAPACIDADE_TOTAL - RESERVA_TECNICA)
+                               None para OUCs sem teto global.
     """
     teto_r_nao_incentivado_m2: Optional[Decimal]
     r_nao_inc_consumido_global: Decimal
+    capacidade_global_m2: Optional[Decimal] = None
 
 
 @dataclass(frozen=True)
@@ -77,6 +105,7 @@ class SolicitacaoDTO:
     titulo_ids: list[UUID]
     titulos: list[TituloDTO]        # snapshots dos títulos do lote
     saldo_setor: SaldoSetorDTO      # pré-calculado pelo repositório
+    limites_setor: Optional["LimitesSetorDTO"] = None  # None = fallback para setor.*
     incentivado: Optional[bool] = None      # None = OUC sem distinção
     limites_ouc: Optional["LimitesOucDTO"] = None  # None = OUC sem limites adicionais
 

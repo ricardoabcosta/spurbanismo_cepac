@@ -17,7 +17,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
+    from .lei_ouc import LeiOuc
     from .operacao_urbana import OperacaoUrbana
+    from .setor_estoque_lei import SetorEstoqueLei
     from .titulo_cepac import TituloCepac
     from .movimentacao import Movimentacao
     from .solicitacao_vinculacao import SolicitacaoVinculacao
@@ -100,6 +102,11 @@ class Setor(Base):
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,
         server_default=text("now()"),
+    )
+
+    # --- Estoque por lei (multi-lei) ---
+    estoques_por_lei: Mapped[list["SetorEstoqueLei"]] = relationship(
+        "SetorEstoqueLei", back_populates="setor", lazy="select"
     )
 
     # --- Relacionamentos ---

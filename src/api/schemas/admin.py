@@ -147,3 +147,79 @@ class PapelUpdate(BaseModel):
 class AtivoUpdate(BaseModel):
     """Payload para ativar ou desativar um usuário."""
     ativo: bool
+
+
+# ---------------------------------------------------------------------------
+# Lei OUC — catálogo de leis por operação urbana
+# ---------------------------------------------------------------------------
+
+class LeiOucIn(BaseModel):
+    """Payload para criar uma lei."""
+    operacao_urbana_id: int = Field(..., gt=0)
+    identificador: str = Field(..., min_length=1, max_length=30)
+    nome: Optional[str] = None
+    data_vigencia_inicio: Optional[date] = None
+    data_vigencia_fim: Optional[date] = None
+    ordem: int = Field(..., gt=0)
+    vigente: bool = False
+    consumo_historico_r_m2: Optional[Decimal] = Field(None, ge=0)
+    consumo_historico_nr_m2: Optional[Decimal] = Field(None, ge=0)
+    estoque_geral_m2: Optional[Decimal] = Field(None, ge=0)
+
+
+class LeiOucOut(BaseModel):
+    """Representação de uma lei."""
+    id: int
+    operacao_urbana_id: int
+    identificador: str
+    nome: Optional[str]
+    data_vigencia_inicio: Optional[date]
+    data_vigencia_fim: Optional[date]
+    ordem: int
+    vigente: bool
+    consumo_historico_r_m2: Optional[Decimal]
+    consumo_historico_nr_m2: Optional[Decimal]
+    estoque_geral_m2: Optional[Decimal]
+
+    model_config = {"from_attributes": True}
+
+
+class LeiOucUpdate(BaseModel):
+    """Payload para atualizar uma lei (campos opcionais)."""
+    nome: Optional[str] = None
+    data_vigencia_inicio: Optional[date] = None
+    data_vigencia_fim: Optional[date] = None
+    ordem: Optional[int] = None
+    vigente: Optional[bool] = None
+    consumo_historico_r_m2: Optional[Decimal] = None
+    consumo_historico_nr_m2: Optional[Decimal] = None
+    estoque_geral_m2: Optional[Decimal] = None
+
+
+# ---------------------------------------------------------------------------
+# SetorEstoqueLei — estoque por setor × lei
+# ---------------------------------------------------------------------------
+
+class SetorEstoqueLeiIn(BaseModel):
+    """Payload para criar registro de estoque por lei."""
+    setor_id: UUID = Field(...)
+    lei_ouc_id: int = Field(..., gt=0)
+    estoque_total_r_m2: Decimal = Field(..., ge=0)
+    estoque_total_nr_m2: Decimal = Field(..., ge=0)
+    teto_r_m2: Optional[Decimal] = Field(None, ge=0)
+    teto_nr_m2: Optional[Decimal] = Field(None, ge=0)
+    reserva_r_m2: Optional[Decimal] = Field(None, ge=0)
+
+
+class SetorEstoqueLeiOut(BaseModel):
+    """Representação do estoque por lei."""
+    id: int
+    setor_id: UUID
+    lei_ouc_id: int
+    estoque_total_r_m2: Decimal
+    estoque_total_nr_m2: Decimal
+    teto_r_m2: Optional[Decimal]
+    teto_nr_m2: Optional[Decimal]
+    reserva_r_m2: Optional[Decimal]
+
+    model_config = {"from_attributes": True}

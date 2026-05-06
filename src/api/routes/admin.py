@@ -481,7 +481,7 @@ async def listar_leis(
     stmt = stmt.order_by(LeiOuc.operacao_urbana_id, LeiOuc.ordem)
     result = await session.execute(stmt)
     leis = result.scalars().all()
-    return [LeiOucOut.model_validate(l) for l in leis]
+    return [LeiOucOut.model_validate(lei) for lei in leis]
 
 
 @router.post(

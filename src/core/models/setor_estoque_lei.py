@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Uuid
+from sqlalchemy import ForeignKey, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base

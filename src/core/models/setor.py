@@ -17,7 +17,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
-    from .lei_ouc import LeiOuc
     from .operacao_urbana import OperacaoUrbana
     from .setor_estoque_lei import SetorEstoqueLei
     from .titulo_cepac import TituloCepac

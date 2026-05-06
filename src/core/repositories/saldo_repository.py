@@ -150,7 +150,7 @@ async def get_limites_setor(
     """
     if lei_vigente is not None:
         # Buscar via setor_estoque_lei — multi-lei
-        stmt = (
+        stmt_multi = (
             select(
                 SetorEstoqueLei.estoque_total_r_m2,
                 SetorEstoqueLei.estoque_total_nr_m2,
@@ -169,7 +169,7 @@ async def get_limites_setor(
             )
             .limit(1)
         )
-        result = await session.execute(stmt)
+        result = await session.execute(stmt_multi)
         row = result.one_or_none()
         if row is not None:
             estoque_total = row.estoque_total_m2
@@ -187,7 +187,7 @@ async def get_limites_setor(
             )
 
     # Fallback: usar campos denormalizados de setor.*
-    stmt = (
+    stmt_fallback = (
         select(
             Setor.estoque_total_m2,
             Setor.teto_nr_m2,
@@ -199,7 +199,7 @@ async def get_limites_setor(
         .where(Setor.nome == setor_nome)
         .limit(1)
     )
-    result = await session.execute(stmt)
+    result = await session.execute(stmt_fallback)
     row = result.one_or_none()
     if row is None:
         return LimitesSetorDTO(

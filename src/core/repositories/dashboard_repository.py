@@ -52,6 +52,7 @@ class OcupacaoSetorDTO:
     disponivel: Decimal
     percentual_ocupado: float
     teto_nr: Optional[Decimal]
+    teto_r_m2: Optional[Decimal]
     saldo_nr_liquido: Optional[Decimal]
     bloqueado_nr: bool
 
@@ -212,6 +213,7 @@ async def calcular_ocupacao_setores(
                 disponivel=disponivel,
                 percentual_ocupado=round(percentual_ocupado, 2),
                 teto_nr=teto_nr,
+                teto_r_m2=setor.teto_r_m2,
                 saldo_nr_liquido=saldo_nr_liquido,
                 bloqueado_nr=bloqueado_nr,
             )

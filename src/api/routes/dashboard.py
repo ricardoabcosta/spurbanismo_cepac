@@ -134,6 +134,7 @@ async def snapshot(
                 disponivel=s.disponivel,
                 percentual_ocupado=s.percentual_ocupado,
                 teto_nr=s.teto_nr,
+                teto_r=s.teto_r_m2,
                 saldo_nr_liquido=s.saldo_nr_liquido,
                 bloqueado_nr=s.bloqueado_nr,
             )
@@ -175,6 +176,7 @@ async def setores(
             disponivel=s.disponivel,
             percentual_ocupado=s.percentual_ocupado,
             teto_nr=s.teto_nr,
+            teto_r=s.teto_r_m2,
             saldo_nr_liquido=s.saldo_nr_liquido,
             bloqueado_nr=s.bloqueado_nr,
         )

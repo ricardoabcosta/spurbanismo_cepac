@@ -221,61 +221,68 @@ const DashboardPage: React.FC = () => {
           </div>
 
           {/* Sino de Travas Ativas */}
-          <button
-            onClick={() => setModalTravasAberto(true)}
-            title="Travas Ativas"
-            style={{
-              position: "relative",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: 6,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 6,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.06)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={(data?.alertas.length ?? 0) > 0 ? "#EF9F27" : "#555"}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            {(data?.alertas.length ?? 0) > 0 && (
-              <span
+          {(() => {
+            const alertas = data?.alertas ?? [];
+            const hasRed = alertas.some(a => a.tipo === "TETO_NR_EXCEDIDO" || a.tipo === "RESERVA_R_VIOLADA");
+            const sinoCor = alertas.length === 0 ? "#555" : hasRed ? "#E24B4A" : "#EF9F27";
+            return (
+              <button
+                onClick={() => setModalTravasAberto(true)}
+                title="Travas Ativas"
                 style={{
-                  position: "absolute",
-                  top: 2,
-                  right: 2,
-                  background: "#EF9F27",
-                  color: "#fff",
-                  borderRadius: "50%",
-                  fontSize: 10,
-                  minWidth: 16,
-                  height: 16,
+                  position: "relative",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 6,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  padding: "0 3px",
+                  borderRadius: 6,
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.06)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
-                {data!.alertas.length}
-              </span>
-            )}
-          </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={sinoCor}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {alertas.length > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      background: sinoCor,
+                      color: "#fff",
+                      borderRadius: "50%",
+                      fontSize: 10,
+                      minWidth: 16,
+                      height: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      padding: "0 3px",
+                    }}
+                  >
+                    {alertas.length}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
         </div>
 
         {/* Modal de Travas Ativas */}

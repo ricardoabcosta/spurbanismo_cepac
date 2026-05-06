@@ -1,3 +1,4 @@
+
 /**
  * GraficoEstoqueSetores — Visão comparativa R vs NR por setor.
  * Parte 1: BarChart agrupado R/NR com consumo, disponível e estouro.
@@ -33,6 +34,8 @@ interface Derivados {
   overNR: number;
   pctR: number;
   pctNR: number;
+  tetoR: number | null;
+  overR: number;
 }
 
 function calcDerivados(s: OcupacaoSetor): Derivados {
@@ -47,16 +50,22 @@ function calcDerivados(s: OcupacaoSetor): Derivados {
   const overNR = Math.max(0, consNR - maxNR);
   const pctR = maxR > 0 ? (consR / maxR) * 100 : 0;
   const pctNR = maxNR > 0 ? (consNR / maxNR) * 100 : 0;
-  return { maxNR, maxR, consR, consNR, analR, analNR, dispR, dispNR, overNR, pctR, pctNR };
+  const tetoR = s.teto_r ? parseFloat(s.teto_r) : null;
+  const overR = tetoR !== null ? Math.max(0, consR - tetoR) : 0;
+  return { maxNR, maxR, consR, consNR, analR, analNR, dispR, dispNR, overNR, pctR, pctNR, tetoR, overR };
 }
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(v);
 
-function consumeColor(pct: number, isR: boolean): string {
+function consumeColor(pct: number, isR: boolean, tetoR?: number | null, consR?: number): string {
   if (isR) {
-    // R = piso (mínimo): abaixo de 100% = não atingiu o mínimo → vermelho
-    return pct >= 100 ? "#185FA5" : "#E24B4A";
+    // R: Azul normal — cliente acompanha via notificações
+    // Exceção: vermelho se teto_r configurado e consumo R ultrapassou o teto
+    if (tetoR != null && consR != null && consR > tetoR) {
+      return "#E24B4A";
+    }
+    return "#185FA5";
   } else {
     // NR = teto (máximo): >= 100% = estourou o limite → vermelho
     return pct >= 100 ? "#E24B4A" : "#185FA5";
@@ -74,6 +83,7 @@ interface ChartEntry {
   _pctR: number;
   _pctNR: number;
   _setorNome: string;
+  _tetoR: number | null;
 }
 
 interface TooltipPayloadItem {
@@ -129,6 +139,7 @@ const GraficoEstoqueSetores: React.FC<Props> = ({ setores }) => {
       _pctR: d.pctR,
       _pctNR: d.pctNR,
       _setorNome: s.nome,
+      _tetoR: d.tetoR,
     };
   });
 
@@ -174,7 +185,7 @@ const GraficoEstoqueSetores: React.FC<Props> = ({ setores }) => {
           {/* Stack R — índice = setorIdx diretamente */}
           <Bar dataKey="consR" stackId="r" fill="#185FA5" onClick={(data) => selectSetor(data.setorIdx)} cursor="pointer">
             {chartData.map((e, i) => (
-              <Cell key={`consR-${i}`} fill={consumeColor(e._pctR, true)} fillOpacity={selecionado === null || selecionado === i ? 1 : 0.2} />
+              <Cell key={`consR-${i}`} fill={consumeColor(e._pctR, true, e._tetoR, e.consR)} fillOpacity={selecionado === null || selecionado === i ? 1 : 0.2} />
             ))}
           </Bar>
           <Bar dataKey="dispR" stackId="r" fill="#B5D4F4" onClick={(data) => selectSetor(data.setorIdx)} cursor="pointer">
@@ -288,7 +299,7 @@ const GraficoEstoqueSetores: React.FC<Props> = ({ setores }) => {
                   }}
                 >
                   <span>R</span>
-                  <span style={{ fontWeight: 600, color: consumeColor(d.pctR, true) }}>
+                  <span style={{ fontWeight: 600, color: consumeColor(d.pctR, true, d.tetoR, d.consR) }}>
                     {d.pctR.toFixed(1)}%
                   </span>
                 </div>
@@ -304,7 +315,7 @@ const GraficoEstoqueSetores: React.FC<Props> = ({ setores }) => {
                     style={{
                       width: `${Math.min(100, d.pctR)}%`,
                       height: "100%",
-                      background: consumeColor(d.pctR, true),
+                      background: consumeColor(d.pctR, true, d.tetoR, d.consR),
                       borderRadius: 4,
                       transition: "width 0.3s",
                     }}

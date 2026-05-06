@@ -26,6 +26,7 @@ export interface OcupacaoSetor {
   disponivel: string;
   percentual_ocupado: number;
   teto_nr: string | null;
+  teto_r: string | null;
   saldo_nr_liquido: string | null;
   bloqueado_nr: boolean;
 }

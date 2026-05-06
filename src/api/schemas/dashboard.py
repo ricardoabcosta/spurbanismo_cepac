@@ -49,6 +49,9 @@ class OcupacaoSetorOut(BaseModel):
     teto_nr: Optional[Decimal] = Field(
         default=None, description="Teto NR do setor (NULL = sem teto específico)"
     )
+    teto_r: Optional[Decimal] = Field(
+        default=None, description="Teto R do setor (NULL = sem teto específico)"
+    )
     saldo_nr_liquido: Optional[Decimal] = Field(
         default=None, description="teto_nr − (consumido_nr + em_analise_nr)"
     )

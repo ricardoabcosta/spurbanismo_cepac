@@ -2,7 +2,7 @@
  * Funções tipadas para os endpoints do Dashboard Executivo.
  */
 import apiClient from "./client";
-import type { AlertaSetorial, CepacSnapshot, DashboardSnapshot, MedicaoObra, OperacaoUrbanaResumo } from "../types/api";
+import type { AlertaSetorial, CepacSnapshot, DashboardSnapshot, MedicaoObra, OperacaoUrbanaResumo, OucabSnapshot } from "../types/api";
 
 /**
  * GET /dashboard/snapshot
@@ -91,6 +91,14 @@ export interface GraficosOut {
   g7_area_media: number;
   g7_media_cepac_m2: number;
   g7_correlacao: number;
+}
+
+/**
+ * GET /dashboard/oucab
+ */
+export async function fetchOucabSnapshot(): Promise<OucabSnapshot> {
+  const response = await apiClient.get<OucabSnapshot>("/dashboard/oucab");
+  return response.data;
 }
 
 export async function fetchGraficos(oucId?: number): Promise<GraficosOut> {

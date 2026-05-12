@@ -77,3 +77,29 @@ export interface OperacaoUrbanaResumo {
   nome: string;
   ativo: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// OUCAB — snapshot com 6 séries por setor
+// ---------------------------------------------------------------------------
+
+export interface OucabSetor {
+  nome: string;
+  teto_r_m2: string | null;
+  teto_nr_m2: string | null;
+  r_inc_consumido: string;
+  r_inc_em_analise: string;
+  r_nao_inc_consumido: string;
+  r_nao_inc_em_analise: string;
+  nr_consumido: string;
+  nr_em_analise: string;
+  r_disponivel: string | null;
+  nr_disponivel: string | null;
+}
+
+export interface OucabSnapshot {
+  setores: OucabSetor[];
+  teto_r_nao_inc_global_m2: string;
+  r_nao_inc_consumido_global: string;
+  r_nao_inc_disponivel_global: string;
+  pct_r_nao_inc_global: number;
+}

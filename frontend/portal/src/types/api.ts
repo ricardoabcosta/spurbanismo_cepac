@@ -34,6 +34,9 @@ export interface PropostaIn {
   tipo_contrapartida?: string;        // default: 'CEPAC (título)'
   cepac_aca?: number | null;
   cepac_parametros?: number | null;
+  // OUCAB: split R Incentivado / R Não-Incentivado
+  aca_r_inc_m2?: number | null;
+  aca_r_nao_inc_m2?: number | null;
 }
 
 // ---------------------------------------------------------------------------

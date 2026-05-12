@@ -13,6 +13,7 @@ import GraficoComposicaoNuvem from "../components/GraficoComposicaoNuvem";
 import MapaAlertas from "../components/MapaAlertas";
 import PainelCepac from "../components/PainelCepac";
 import GraficosAnaliticos from "../components/GraficosAnaliticos";
+import PainelOucab from "../components/PainelOucab";
 import type { OperacaoUrbanaResumo } from "../types/api";
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
@@ -42,7 +43,7 @@ const formatTimestamp = (iso: string): string => {
   }
 };
 
-type Painel = "estoque" | "cepacs";
+type Painel = "estoque" | "cepacs" | "oucab";
 
 const DashboardPage: React.FC = () => {
   const [painel, setPainel] = useState<Painel>("estoque");
@@ -54,6 +55,9 @@ const DashboardPage: React.FC = () => {
   const [oucs, setOucs] = useState<OperacaoUrbanaResumo[]>([]);
   // null = ainda não inicializado (aguardando lista de OUCs)
   const [selectedOucId, setSelectedOucId] = useState<number | null>(null);
+
+  const oucSelecionada = oucs.find((o) => o.id === selectedOucId);
+  const isOucab = oucSelecionada?.sigla === "AB";
 
   useEffect(() => {
     fetchOperacoesUrbanas()
@@ -71,6 +75,8 @@ const DashboardPage: React.FC = () => {
   const handleOucChange = (id: number) => {
     setSelectedOucId(id);
     localStorage.setItem(OUC_STORAGE_KEY, String(id));
+    const sigla = oucs.find((o) => o.id === id)?.sigla;
+    if (sigla !== "AB") setPainel("estoque");
   };
 
   const { data, loading, error } = useSnapshot(undefined, selectedOucId);
@@ -199,7 +205,7 @@ const DashboardPage: React.FC = () => {
         {/* Toggle de navegação entre painéis + sino de travas */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div style={{ display: "flex", gap: 8 }}>
-            {(["estoque", "cepacs"] as Painel[]).map((p) => (
+            {(["estoque", "cepacs", ...(isOucab ? ["oucab" as Painel] : [])] as Painel[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPainel(p)}
@@ -215,7 +221,7 @@ const DashboardPage: React.FC = () => {
                   transition: "all .15s",
                 }}
               >
-                {p === "estoque" ? "Estoque de Área" : "CEPACs"}
+                {p === "estoque" ? "Estoque de Área" : p === "cepacs" ? "CEPACs" : "OUCAB"}
               </button>
             ))}
           </div>
@@ -339,6 +345,9 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Painel OUCAB */}
+        {painel === "oucab" && isOucab && <PainelOucab />}
 
         {/* Painel CEPAC + Análises */}
         {painel === "cepacs" && (

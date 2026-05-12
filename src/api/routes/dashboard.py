@@ -9,6 +9,7 @@ Autenticação:
   - DIRETOR apenas: /snapshot?data=YYYY-MM-DD (histórico), /medicoes
 """
 from datetime import date
+from decimal import Decimal
 from typing import Annotated, Literal, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -28,11 +29,14 @@ from src.api.schemas.dashboard import (
     GraficosOut,
     MedicaoOut,
     OcupacaoSetorOut,
+    OucabSetorOut,
+    OucabSnapshotOut,
 )
 from src.core.models.configuracao_operacao import ConfiguracaoOperacao
 from src.core.models.operacao_urbana import OperacaoUrbana
 from src.core.models.setor import Setor
 from src.core.repositories import dashboard_repository
+from src.core.repositories import saldo_repository
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -313,3 +317,61 @@ async def graficos(
     """
     dados = await dashboard_repository.montar_graficos(session, operacao_urbana_id)
     return GraficosOut(**dados)
+
+
+# ---------------------------------------------------------------------------
+# GET /dashboard/oucab
+# ---------------------------------------------------------------------------
+
+_TETO_R_NAO_INC_OUCAB = Decimal("675000.00")  # art. 39 §2 Lei 15.893/2013
+
+
+@router.get(
+    "/oucab",
+    response_model=OucabSnapshotOut,
+    status_code=status.HTTP_200_OK,
+    summary="Snapshot OUCAB — 6 séries por setor (R-Inc, R-NI, NR)",
+    description=(
+        "Retorna ocupação OUCAB com split R Incentivado / R Não-Incentivado / NR "
+        "por setor, mais o indicador global do teto cross-setor de R-NI (675.000 m²). "
+        "Setores-pai com estoque=0 são incluídos para consistência."
+    ),
+)
+async def oucab_snapshot(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UsuarioAutenticado, Depends(require_tecnico)],
+) -> OucabSnapshotOut:
+    """Snapshot OUCAB com decomposição R Incentivado / R Não-Incentivado / NR por setor."""
+    setores_data, r_nao_inc_global = await saldo_repository.calcular_saldo_oucab_setores(
+        session, ouc_id=3
+    )
+
+    r_nao_inc_disponivel = max(Decimal("0"), _TETO_R_NAO_INC_OUCAB - r_nao_inc_global)
+    pct = (
+        float(r_nao_inc_global / _TETO_R_NAO_INC_OUCAB * 100)
+        if _TETO_R_NAO_INC_OUCAB > 0
+        else 0.0
+    )
+
+    return OucabSnapshotOut(
+        setores=[
+            OucabSetorOut(
+                nome=s.nome,
+                teto_r_m2=s.teto_r_m2,
+                teto_nr_m2=s.teto_nr_m2,
+                r_inc_consumido=s.r_inc_consumido,
+                r_inc_em_analise=s.r_inc_em_analise,
+                r_nao_inc_consumido=s.r_nao_inc_consumido,
+                r_nao_inc_em_analise=s.r_nao_inc_em_analise,
+                nr_consumido=s.nr_consumido,
+                nr_em_analise=s.nr_em_analise,
+                r_disponivel=s.r_disponivel,
+                nr_disponivel=s.nr_disponivel,
+            )
+            for s in setores_data
+        ],
+        teto_r_nao_inc_global_m2=_TETO_R_NAO_INC_OUCAB,
+        r_nao_inc_consumido_global=r_nao_inc_global,
+        r_nao_inc_disponivel_global=r_nao_inc_disponivel,
+        pct_r_nao_inc_global=round(pct, 2),
+    )

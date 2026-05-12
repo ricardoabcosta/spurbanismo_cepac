@@ -1,6 +1,6 @@
 # Planejamento — Carga OUCAB
 
-**Status**: 🟡 **Planejamento — pendente validação do cliente**
+**Status**: 🟢 **Decisões Q1–Q13 confirmadas — pronto para iniciar Sessão 1**
 **Origem**: `docs/novos/OUCAB_CONTROLE_ESTOQUES_mar_2026.xlsx` (posição 31/03/2026) + `docs/novos/GUIA_PRATICO_OUCAB_FINAL.pdf` (versão 1.1, 14/12/2023)
 **Lei vigente**: Lei nº 15.893/2013 (alterada pela Lei nº 17.561/2021 — substitui Quadro III de fatores de equivalência)
 **Decreto regulamentador**: Decreto nº 55.392/2014
@@ -213,18 +213,27 @@ A tela atual do dashboard exibe Big Numbers da OUCAE (Brooklin, Berrini etc.). P
 
 Decisão: usar mesma estrutura de cards mas alimentada por novo endpoint `/dashboard/oucab` ou parametrizar `/dashboard/oucae` com query param `?ouc=AB`.
 
-## 4. Decisões a confirmar com o cliente
+## 4. Decisões confirmadas
 
-| # | Tema | Opção sugerida | Alternativa |
-|---|---|---|---|
-| Q1 | Fatores Fe — coluna semântica | (a) reutilizar `fator_equivalencia_f1` para Fe único; `f2` = NULL | (b) Nova coluna `fator_equivalencia_unico` |
-| Q2 | Setores sem estoque | Cadastrar A1, A2, D, I, I2 com estoque 0 (catálogo completo) | Manter os 13 atuais |
-| Q3 | Decomposição R Inc / R Não-Inc na proposta | Adicionar `aca_r_inc_m2` e `aca_r_nao_inc_m2` em `proposta` | Manter agregado `aca_r_m2` + flag `incentivado` |
-| Q4 | Tratar inconsistência subtotal aba B (157.365,51 vs 152.985,48) | Confiar nas linhas individuais (152.985,48) | Confiar no Geral (157.365,51) |
-| Q5 | Status do setor H (Em análise vs Deferido) | Considerar Deferido (aba H, 09/03/2026) | Considerar Em análise (aba Geral) |
-| Q6 | Tela do dashboard OUCAB | Reutilizar layout OUCAE com 3 categorias por setor | Nova tela específica |
-| Q7 | Subsetores na carga | Vincular sempre ao setor da aba (folha ou standalone) | Sempre ao pai |
-| Q8 | Operações pré-2ª distribuição | Não há (1ª distribuição = 2013, 2ª = 12/12/2023) | — |
+Todas as decisões foram validadas pelo cliente em 06/05/2026.
+
+| # | Tema | Decisão final |
+|---|---|---|
+| Q1 | Fatores Fe — coluna semântica | **Reutilizar** `fator_equivalencia_f1` para Fe único; `fator_equivalencia_f2 = NULL` |
+| Q2 | Setores sem estoque | **Cadastrar** A1, A2, D, I, I2 com estoque 0 (catálogo completo de 18 setores) |
+| Q3 | Decomposição R Inc / R Não-Inc na proposta | **Adicionar** `aca_r_inc_m2` e `aca_r_nao_inc_m2` em `proposta` |
+| Q4 | Inconsistência subtotal aba B (157.365,51 vs 152.985,48) | **Confiar** nas linhas individuais → 152.985,48 m² R consumido total + 4.380,03 m² nR |
+| Q5 | Status do setor H | **DEFERIDO** (aba H, 09/03/2026 — proposta AB-0116/BSP) |
+| Q6 | Tela do dashboard OUCAB | **Ajustar** a aba AB já existente (não criar nova tela) — substituir os dados fake atuais pelos valores reais da carga |
+| Q7 | Big Numbers OUCAB | Cards alimentados pelos valores reais (Capacidade 1.850.000 / Saldo Disponível / Total Consumido / Em Análise) |
+| Q8 | Gráfico por setor | **6 séries apenas para AB**: Consumido R-NI · Disponível R-NI · Consumido R-Inc · Disponível R-Inc · Consumido NR · Disponível NR. OUCAE/OUCFL mantêm 4 séries atuais. |
+| Q9 | Setores no gráfico OUCAB | **Ocultar** setores-pai (A, E, F, I) e folhas com `estoque_total_m2 = 0` (A1, A2, D, I2). Exibir nota visual: "Exibindo apenas setores com estoque ativo (10 de 18)." |
+| Q10 | Bug capacidade total no dashboard (2.495.000 ≠ 1.850.000) | **Incluído no escopo** — nova task T-AB2.0 (corrigir soma para excluir pais e setores zerados) |
+| Q11 | ACA R nas propostas WINDSOR pré-2ª distribuição | Todas as 5 deferidas WINDSOR + AB-0096 (AB-003/2024) → `aca_r_nao_inc_m2 = aca_r_m2` e `aca_r_inc_m2 = 0` |
+| Q12 | AB-0096 duplicada (cancelada + deferida) | **Uma única proposta** com **histórico de 2 certidões**: AB-001/2023 (CANCELADA) e AB-003/2024 (VALIDA — status atual). `proposta.codigo = AB-0096` único. |
+| Q13 | Dados ausentes na planilha (endereço, CNPJ, data autuação) | Carregar como NULL; cliente completa via portal/admin |
+| Q14 | Subsetores na carga | Vincular ao setor da aba (folha ou standalone) — todas as 7 propostas vão para B (5×) ou H (1×) |
+| Q15 | Operações pré-2ª distribuição | Não há (1ª distribuição = 2013, 2ª = 12/12/2023). Não modelar consumo histórico em `lei_ouc`. |
 
 ## 5. Modelagem de dados (proposta)
 
@@ -315,9 +324,13 @@ A OUCAB tem **uma única lei vigente**. O modelo multi-lei (já implementado) co
 - `GET /dashboard/oucab` — Big Numbers + tabela por setor (formato Geral.csv).
 - `POST /portal/propostas`: aceitar campos novos.
 
-### 6.6 Frontend
-- **Dashboard**: aba "OUCAB" com Big Numbers (R-NI disponível, R-Inc disponível, nR disponível) + tabela 13×4 (setor, R-NI, R-Inc, nR consumido).
-- **Portal**: form de nova proposta — quando OUC=AB, exibir radio R-Incentivada × R-Não-Incentivada.
+### 6.6 Frontend (Q6/Q7/Q8/Q9)
+- **Dashboard aba AB** (existente — substituir dados fake):
+  - Big Numbers: Capacidade Total (1.850.000) · Saldo Disponível · Total Consumido · Em Análise — alimentados por `/dashboard/oucab` (Q7).
+  - Card adicional **OUCAB-only**: "Teto R Não-Incentivado (675.000 m²)" mostrando consumido/disponível cross-setor.
+  - **Gráfico por setor (6 séries OUCAB)** — Q8: Cons R-NI · Disp R-NI · Cons R-Inc · Disp R-Inc · Cons NR · Disp NR. As OUCAEs e OUCFL continuam com 4 séries (Cons R / Disp R / Cons NR / Disp NR).
+  - **Filtro de setores no gráfico** — Q9: ocultar setores-pai (A, E, F, I) e folhas com estoque 0 (A1, A2, D, I2). Exibir 10 setores ativos. Nota visual abaixo do gráfico: *"Exibindo apenas setores com estoque ativo (10 de 18). Setores agregadores (A, E, F, I) e zerados (A1, A2, D, I2) estão ocultos."*
+- **Portal**: form de nova proposta — quando OUC=AB e uso=R, exibir radio "Unidade Incentivada (HIS/EHIS)" × "Residencial padrão"; campos `aca_r_inc_m2`/`aca_r_nao_inc_m2` aparecem condicionalmente.
 
 ## 7. Script de carga
 
@@ -326,16 +339,19 @@ A OUCAB tem **uma única lei vigente**. O modelo multi-lei (já implementado) co
 **Fluxo**:
 1. Lê `docs/novos/OUCAB_CONTROLE_ESTOQUES_mar_2026.xlsx`.
 2. Para cada aba de subsetor (A3, B, C, E1, E2, F1, F2, G, H, I1) — pula linhas vazias e modelo:
-   - Cria `Proposta` com `codigo` (AB-XXXX), atribui `setor_id` pelo nome do setor da linha.
+   - **Aba B requer tratamento especial** (Q12): a primeira ocorrência de `AB-0096` é a certidão CANCELADA (AB-001/2023); a segunda ocorrência (AB-003/2024) é a certidão VÁLIDA do mesmo `codigo=AB-0096`. Carga deve criar **uma única `Proposta` codigo=AB-0096** com **duas `Certidao`** vinculadas (AB-001/2023 status=CANCELADA + AB-003/2024 status=VALIDA). Status atual da proposta = DEFERIDO (segue a certidão atual).
+   - **Aba B linha 11 (setor H)** deve ser **ignorada** — é duplicata da entrada da aba H (decisão Q4).
+   - Cria `Proposta` com `codigo` (AB-XXXX), atribui `setor_id` pelo nome do setor da linha (Q14).
    - Define `lei_vigente='15.893/2013'`.
-   - Como a planilha não detalha ACA bruta vs benefícios, preenche apenas `aca_r_m2`/`aca_nr_m2` (campo "AREA DE CONSTRUÇÃO ADICIONAL ONEROSA"); `aca_r_real_m2 = aca_r_m2`, `aca_r_beneficios_m2 = 0`.
-   - Se houver "AREA ADICIONAL DE UNIDADE": preencher `aca_r_inc_m2`. Restante R vai para `aca_r_nao_inc_m2`.
+   - **Q11 — decomposição R-Inc/R-NI**: para todas as propostas R deferidas (5 WINDSOR + AB-0096), preencher `aca_r_nao_inc_m2 = aca_r_m2` e `aca_r_inc_m2 = 0` (anteriores ao art. 46 §1).
+   - **Q13 — campos ausentes na planilha**: `endereco`, `cnpj`, `cpf`, `data_autuacao` ficam NULL. Preencher apenas o que a planilha tem: `interessado`, `numero_pa` (SEI), `contribuinte_sq` (lista de contribuintes), `numero_certidao`, `data_certidao`, áreas e CEPACs.
+   - Como a planilha não detalha ACA bruta vs benefícios (fruição pública), preenche `aca_r_real_m2 = aca_r_m2`, `aca_r_beneficios_m2 = 0` (idem para nR).
    - Se status=Deferido e situação=VÁLIDA: cria `Certidao` (TipoCertidaoEnum.VINCULACAO).
    - Cria `TituloCepac`(estado=CONSUMIDO, incentivado=FALSE para R-NI / TRUE para R-Inc / NULL para NR) + `Movimentacao` negativa.
-3. **Não há histórico cross-lei** — não há leis anteriores na OUCAB.
+3. **Não há histórico cross-lei** (Q15) — não há leis anteriores na OUCAB.
 4. Loga relatório final de comparação Excel × DB.
 
-**Idempotência**: por `codigo + numero_certidao + data_certidao`.
+**Idempotência**: por `codigo + numero_certidao + data_certidao`. Re-execução com AB-0096 já existente atualiza certidões sem duplicar.
 
 ## 8. Validação pós-carga
 
@@ -416,6 +432,27 @@ Tolerância: ≤ 1,00 m² por arredondamento. Divergência > 1 m² em qualquer l
 
 ### Sessão 2 — Engine + Repositórios (~2 dias)
 
+#### T-AB2.0 — Corrigir soma da capacidade total no dashboard (bug Q10)
+**Arquivos**: `src/core/repositories/dashboard_repository.py` (e/ou `saldo_repository.py`)
+**Problema atual**: `SUM(estoque_total_m2)` em todos os setores OUCAB duplica o estoque dos pais (A, E, F, I) com seus filhos. Hoje retorna 2.495.000 m²; após Q2 (cadastrar A1/A2/D/I/I2) ficaria 2.565.000 m². Correto = 1.850.000 m².
+**Conteúdo**: alterar a query para somar **somente setores-folha** (que não são pai de nenhum outro):
+```sql
+SELECT COALESCE(SUM(s.estoque_total_m2), 0)
+FROM setor s
+WHERE s.operacao_urbana_id = :ouc_id
+  AND s.id NOT IN (
+      SELECT DISTINCT setor_pai_id
+      FROM setor
+      WHERE setor_pai_id IS NOT NULL
+        AND operacao_urbana_id = :ouc_id
+  );
+```
+**Critério de aceite**:
+- OUCAB → 1.850.000 m² (exato).
+- OUCAE → soma dos 5 setores (4.600.000 m²) — sem mudança de comportamento.
+- OUCFL → soma dos 4 setores macro (1.756.155 m² — Lei 18.175 vigente) — sem mudança.
+- Teste de regressão para as 3 OUCs.
+
 #### T-AB2.1 — Novo validator `oucab_setor.py`
 **Arquivos**: `src/core/engine/validators/oucab_setor.py` (novo)
 **Conteúdo**: lê `solicitacao.limites_setor.estoque_total_m2` e `teto_nr_m2` (já parametrizados via `setor_estoque_lei`); bloqueia quando consumido + solicitação > limite.
@@ -472,32 +509,42 @@ Tolerância: ≤ 1,00 m² por arredondamento. Divergência > 1 m² em qualquer l
 **Conteúdo**: `OucabResumoOut`, `OucabSetorRow`, função `getDashboardOucab()`.
 **Critério de aceite**: chamada à API resolve com tipos.
 
-#### T-AB4.2 — Página Dashboard OUCAB
-**Arquivos**: `frontend/dashboard/src/pages/OucabPage.tsx` (novo)
-**Conteúdo**: Big Numbers (3 cards: R-NI, R-Inc, nR) + tabela 13×7 (setor, R-NI cons/disp, R-Inc cons/disp, nR cons/disp).
-**Critério de aceite**: visualmente espelha a aba Geral da planilha.
+#### T-AB4.2 — Atualizar aba AB do Dashboard (existente)
+**Arquivos**: componente que renderiza o painel quando o toggle AB está ativo (`frontend/dashboard/src/pages/DashboardPage.tsx` ou similar)
+**Conteúdo**:
+- Big Numbers — substituir dados fake atuais (Q7) pelos valores reais do endpoint `/dashboard/oucab`: Capacidade Total · Saldo Geral Disponível · Total Consumido · Em Análise.
+- **Card extra OUCAB**: "Teto R Não-Incentivado" (675.000 m²) — exibir consumido/disponível cross-setor (alimentado por `r_nao_inc_consumido_global`).
+- **Gráfico por setor com 6 séries** (Q8) — apenas quando OUC=AB. Manter as 4 séries legadas para AE/FL.
+- **Filtro de visibilidade** (Q9): ocultar A, E, F, I (pais) e A1, A2, D, I2 (folhas zeradas). Mostrar apenas as 10 entidades com estoque ativo: A3, B, C, E1, E2, F1, F2, G, H, I1.
+- **Nota visual** abaixo do gráfico: `"Exibindo apenas setores com estoque ativo (10 de 18). Setores agregadores (A, E, F, I) e zerados (A1, A2, D, I2) estão ocultos."`
+**Critério de aceite**:
+- Aba AB com toggle ativo exibe Big Numbers reais (Capacidade=1.850.000, Consumido=152.985,48 R + 4.380,03 NR após carga).
+- Gráfico mostra 10 colunas com 6 séries cada.
+- AE/FL preservam comportamento atual (4 séries).
 
-#### T-AB4.3 — Toggle OUC no menu
-**Arquivos**: `frontend/dashboard/src/App.tsx`, header
-**Conteúdo**: dropdown OUCAE / OUCFL / OUCAB → roteia para a página correspondente.
-**Critério de aceite**: navegação fluida entre as 3 OUCs.
-
-#### T-AB4.4 — Portal: form de nova proposta com R-Inc/R-NI
+#### T-AB4.3 — Portal: form de nova proposta com R-Inc/R-NI
 **Arquivos**: `frontend/portal/src/components/NovaProposta.tsx`
 **Conteúdo**: quando OUC=AB e uso=R, exibir radio "Unidade Incentivada (HIS/EHIS)" / "Residencial padrão"; campos `aca_r_inc_m2`/`aca_r_nao_inc_m2` aparecem condicionalmente.
 **Critério de aceite**: submissão cria proposta com decomposição correta.
 
-#### T-AB4.5 — Deploy Container Apps
+#### T-AB4.4 — Deploy Container Apps
 **Conteúdo**: `gh workflow run deploy.yml`. Validar revisões dashboard e portal.
-**Critério de aceite**: dashboard e portal em produção exibem aba/toggle OUCAB; nova proposta em B funciona.
+**Critério de aceite**: dashboard e portal em produção exibem aba AB com dados reais; nova proposta em B funciona.
 
 ---
 
 ## 11. Resumo executivo
 
-- A OUCAB **já tem boa parte da infraestrutura pronta** no sistema (lei, setores, hierarquia, flag incentivado, teto cross-setor de 675K).
-- **Lacunas pequenas mas críticas**: Fe errados, 5 setores ausentes, falta validator de teto setorial OUCAB, capacity.py hardcoded para OUCAE, dashboard sem visão OUCAB.
-- **Carga é trivial em volume** (7 registros) — o esforço está nas adequações de modelo/regras antes da carga.
-- **Plano em 4 sessões (~5,5 dias úteis)** com 18 tasks numeradas, decisões claras a confirmar com o cliente, critérios de aceite verificáveis.
+- A OUCAB **já tem boa parte da infraestrutura pronta** no sistema (lei, setores, hierarquia, flag incentivado, teto cross-setor de 675K, toggle AB no dashboard).
+- **Lacunas pequenas mas críticas**:
+  - Fatores Fe errados (Quadro III da Lei 17.561/2021 não foi seguido).
+  - 5 setores ausentes (A1, A2, D, I, I2).
+  - **Bug Q10**: capacidade total no dashboard duplica setores-pai → exibe 2.495.000 em vez de 1.850.000 m².
+  - Falta validator de teto setorial OUCAB.
+  - `capacity.py` hardcoded para OUCAE.
+  - `proposta` não distingue R-Inc / R-Não-Inc.
+- **Dashboard aba AB já existe** com toggle e gráfico mas mostra dados fake e usa só 4 séries (precisa 6 para OUCAB — Q8).
+- **Carga é trivial em volume** (7 registros, 1 deles com 2 certidões — AB-0096) — o esforço está nas adequações de modelo/regras antes da carga.
+- **Plano em 4 sessões (~5,5 dias úteis)** com **19 tasks numeradas** (T-AB1.1–T-AB1.6, T-AB2.0–T-AB2.6, T-AB3.1–T-AB3.3, T-AB4.1–T-AB4.4), todas as decisões Q1–Q15 confirmadas, critérios de aceite verificáveis.
 
-**Pendência bloqueante**: respostas Q1–Q8 da §4.
+**Status**: 🟢 **Pronto para iniciar Sessão 1.**

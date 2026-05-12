@@ -107,6 +107,11 @@ class Proposta(Base):
     aca_nr_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
     aca_total_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
 
+    # Decomposição R-Inc / R-Não-Inc (OUCAB — migration 032). NULL para OUCAE/OUCFL.
+    # Invariante: aca_r_m2 = aca_r_inc_m2 + aca_r_nao_inc_m2 quando ambos preenchidos.
+    aca_r_inc_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+    aca_r_nao_inc_m2: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)
+
     # Contrapartida e OODC
     tipo_contrapartida: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     valor_oodc_rs: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)

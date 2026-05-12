@@ -662,7 +662,11 @@ async def montar_snapshot(
         cfg = cfg_result.scalar_one_or_none()
         reserva_tecnica = cfg.reserva_tecnica_m2 if cfg else Decimal("0")
 
-    capacidade_total = sum(s.estoque_total_m2 for s in setores) + reserva_tecnica
+    # Exclui setores-pai para evitar dupla contagem em OUCs hierárquicas (ex: OUCAB)
+    pai_ids = {s.setor_pai_id for s in setores if s.setor_pai_id is not None}
+    capacidade_total = sum(
+        s.estoque_total_m2 for s in setores if s.id not in pai_ids
+    ) + reserva_tecnica
     saldo_geral = sum(occ.disponivel for occ in setores_ocupacao)
     total_consumido = sum(occ.consumido_r + occ.consumido_nr for occ in setores_ocupacao)
     total_em_analise = sum(occ.em_analise_r + occ.em_analise_nr for occ in setores_ocupacao)

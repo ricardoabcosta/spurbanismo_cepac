@@ -95,10 +95,10 @@ async def test_listar_setores_filtro_ouc_oucae(client_tecnico: AsyncClient) -> N
 
 @pytest.mark.asyncio
 async def test_listar_setores_por_ouc_endpoint(client_tecnico: AsyncClient) -> None:
-    """GET /admin/operacoes-urbanas/3/setores retorna 13 setores OUCAB."""
+    """GET /admin/operacoes-urbanas/3/setores retorna 18 setores OUCAB (migration 030)."""
     r = await client_tecnico.get("/admin/operacoes-urbanas/3/setores")
     assert r.status_code == 200
-    assert len(r.json()) == 13
+    assert len(r.json()) == 18
 
 
 @pytest.mark.asyncio

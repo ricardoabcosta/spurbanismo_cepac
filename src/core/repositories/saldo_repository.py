@@ -10,7 +10,9 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select, func
+from dataclasses import dataclass
+
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.engine.dtos import LimitesOucDTO, LimitesSetorDTO, SaldoSetorDTO
@@ -296,3 +298,96 @@ async def get_limites_ouc(
         r_nao_inc_consumido_global=r_nao_inc_consumido,
         capacidade_global_m2=capacidade_global,
     )
+
+
+# ---------------------------------------------------------------------------
+# OUCAB — Saldo com split R-Inc / R-Não-Inc / NR por setor
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SaldoSetorOucabDTO:
+    """Saldo OUCAB com decomposição R Incentivado / R Não-Incentivado / NR por setor."""
+    nome: str
+    teto_r_m2: Optional[Decimal]   # teto R do setor (setor_estoque_lei ou setor.teto_r_m2)
+    teto_nr_m2: Optional[Decimal]  # teto NR do setor
+    r_inc_consumido: Decimal       # R Incentivado estado=CONSUMIDO
+    r_inc_em_analise: Decimal      # R Incentivado estado=EM_ANALISE
+    r_nao_inc_consumido: Decimal   # R Não-Incentivado estado=CONSUMIDO
+    r_nao_inc_em_analise: Decimal  # R Não-Incentivado estado=EM_ANALISE
+    nr_consumido: Decimal
+    nr_em_analise: Decimal
+
+    @property
+    def r_total_comprometido(self) -> Decimal:
+        return (
+            self.r_inc_consumido + self.r_inc_em_analise
+            + self.r_nao_inc_consumido + self.r_nao_inc_em_analise
+        )
+
+    @property
+    def r_disponivel(self) -> Optional[Decimal]:
+        if self.teto_r_m2 is None:
+            return None
+        return max(Decimal("0"), self.teto_r_m2 - self.r_total_comprometido)
+
+    @property
+    def nr_comprometido(self) -> Decimal:
+        return self.nr_consumido + self.nr_em_analise
+
+    @property
+    def nr_disponivel(self) -> Optional[Decimal]:
+        if self.teto_nr_m2 is None:
+            return None
+        return max(Decimal("0"), self.teto_nr_m2 - self.nr_comprometido)
+
+
+async def calcular_saldo_oucab_setores(
+    session: AsyncSession,
+    ouc_id: int = 3,
+) -> tuple[list[SaldoSetorOucabDTO], Decimal]:
+    """
+    Retorna saldo por setor OUCAB com split R-Inc/R-NI/NR, mais o total R-NI global.
+
+    Usa uma query SQL única para máxima eficiência.
+    Returns: (setores ordenados por nome, r_nao_inc_consumido_global)
+    """
+    rows = (await session.execute(text("""
+        SELECT
+            s.nome,
+            s.teto_r_m2,
+            s.teto_nr_m2,
+            COALESCE(SUM(CASE WHEN m.uso = 'R' AND m.incentivado = TRUE  AND m.estado_novo = 'CONSUMIDO'  THEN t.valor_m2 ELSE 0 END), 0) AS r_inc_consumido,
+            COALESCE(SUM(CASE WHEN m.uso = 'R' AND m.incentivado = TRUE  AND m.estado_novo = 'EM_ANALISE' THEN t.valor_m2 ELSE 0 END), 0) AS r_inc_em_analise,
+            COALESCE(SUM(CASE WHEN m.uso = 'R' AND m.incentivado = FALSE AND m.estado_novo = 'CONSUMIDO'  THEN t.valor_m2 ELSE 0 END), 0) AS r_nao_inc_consumido,
+            COALESCE(SUM(CASE WHEN m.uso = 'R' AND m.incentivado = FALSE AND m.estado_novo = 'EM_ANALISE' THEN t.valor_m2 ELSE 0 END), 0) AS r_nao_inc_em_analise,
+            COALESCE(SUM(CASE WHEN m.uso = 'NR'                          AND m.estado_novo = 'CONSUMIDO'  THEN t.valor_m2 ELSE 0 END), 0) AS nr_consumido,
+            COALESCE(SUM(CASE WHEN m.uso = 'NR'                          AND m.estado_novo = 'EM_ANALISE' THEN t.valor_m2 ELSE 0 END), 0) AS nr_em_analise
+        FROM setor s
+        LEFT JOIN movimentacao m ON m.setor_id = s.id
+            AND m.estado_novo IN ('CONSUMIDO', 'EM_ANALISE')
+        LEFT JOIN titulo_cepac t ON t.id = m.titulo_id
+        WHERE s.operacao_urbana_id = :ouc_id
+        GROUP BY s.nome, s.teto_r_m2, s.teto_nr_m2
+        ORDER BY s.nome
+    """), {"ouc_id": ouc_id})).fetchall()
+
+    setores = [
+        SaldoSetorOucabDTO(
+            nome=r.nome,
+            teto_r_m2=Decimal(str(r.teto_r_m2)) if r.teto_r_m2 is not None else None,
+            teto_nr_m2=Decimal(str(r.teto_nr_m2)) if r.teto_nr_m2 is not None else None,
+            r_inc_consumido=Decimal(str(r.r_inc_consumido)),
+            r_inc_em_analise=Decimal(str(r.r_inc_em_analise)),
+            r_nao_inc_consumido=Decimal(str(r.r_nao_inc_consumido)),
+            r_nao_inc_em_analise=Decimal(str(r.r_nao_inc_em_analise)),
+            nr_consumido=Decimal(str(r.nr_consumido)),
+            nr_em_analise=Decimal(str(r.nr_em_analise)),
+        )
+        for r in rows
+    ]
+
+    r_nao_inc_global = sum(
+        s.r_nao_inc_consumido + s.r_nao_inc_em_analise for s in setores
+    ) if setores else Decimal("0")
+
+    return setores, Decimal(str(r_nao_inc_global))

@@ -292,6 +292,8 @@ class PropostaPortalOut(BaseModel):
     aca_r_m2: Optional[Decimal] = None
     aca_nr_m2: Optional[Decimal] = None
     aca_total_m2: Optional[Decimal] = None
+    aca_r_inc_m2: Optional[Decimal] = None
+    aca_r_nao_inc_m2: Optional[Decimal] = None
     tipo_contrapartida: Optional[str] = Field(
         default=None, description="Ex: 'CEPAC (título)'"
     )
@@ -370,6 +372,17 @@ class PropostaPortalIn(BaseModel):
     aca_nr_m2: Optional[Decimal] = Field(default=None, gt=0)
     aca_total_m2: Optional[Decimal] = Field(default=None, gt=0)
 
+    # OUCAB: decomposição R Incentivado / R Não-Incentivado (migration 032). NULL para OUCAE/OUCFL.
+    # Invariante: aca_r_inc_m2 + aca_r_nao_inc_m2 == aca_r_m2 quando ambos fornecidos.
+    aca_r_inc_m2: Optional[Decimal] = Field(
+        default=None, ge=0,
+        description="ACA R Incentivado (HIS/EHIS — art. 5º IX Lei 15.893/2013). NULL para OUCAE/OUCFL.",
+    )
+    aca_r_nao_inc_m2: Optional[Decimal] = Field(
+        default=None, ge=0,
+        description="ACA R Não-Incentivado (sujeito ao teto de 675.000 m²). NULL para OUCAE/OUCFL.",
+    )
+
     # --- Contrapartida e OODC ---
     tipo_contrapartida: Optional[str] = Field(
         default="CEPAC (título)", max_length=20
@@ -435,6 +448,14 @@ class PropostaPortalIn(BaseModel):
             raise ValueError(
                 "cpf é obrigatório quando tipo_interessado é 'PF'."
             )
+
+        # Regra 4: aca_r_inc + aca_r_nao_inc deve igualar aca_r_m2 quando ambos fornecidos
+        if self.aca_r_inc_m2 is not None and self.aca_r_nao_inc_m2 is not None:
+            soma = self.aca_r_inc_m2 + self.aca_r_nao_inc_m2
+            if self.aca_r_m2 is not None and abs(soma - self.aca_r_m2) > Decimal("0.01"):
+                raise ValueError(
+                    f"aca_r_inc_m2 + aca_r_nao_inc_m2 ({soma}) deve ser igual a aca_r_m2 ({self.aca_r_m2})."
+                )
 
         return self
 

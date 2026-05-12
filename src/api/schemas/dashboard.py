@@ -187,3 +187,54 @@ class GraficosOut(BaseModel):
     g7_area_media: float
     g7_media_cepac_m2: float
     g7_correlacao: float
+
+
+# ---------------------------------------------------------------------------
+# OUCAB — 6 séries por setor (R-Inc, R-NI, NR)
+# ---------------------------------------------------------------------------
+
+class OucabSetorOut(BaseModel):
+    """Ocupação de um setor OUCAB com split R Incentivado / R Não-Incentivado / NR."""
+
+    nome: str
+    teto_r_m2: Optional[Decimal] = Field(
+        default=None, description="Teto R do setor (NULL = sem teto)"
+    )
+    teto_nr_m2: Optional[Decimal] = Field(
+        default=None, description="Teto NR do setor (NULL = sem teto)"
+    )
+    r_inc_consumido: Decimal = Field(
+        ..., description="R Incentivado (HIS/EHIS — art. 5º IX) consumido"
+    )
+    r_inc_em_analise: Decimal
+    r_nao_inc_consumido: Decimal = Field(
+        ..., description="R Não-Incentivado consumido (sujeito ao teto de 675.000 m²)"
+    )
+    r_nao_inc_em_analise: Decimal
+    nr_consumido: Decimal
+    nr_em_analise: Decimal
+    r_disponivel: Optional[Decimal] = Field(
+        default=None, description="teto_r - r_total_comprometido"
+    )
+    nr_disponivel: Optional[Decimal] = Field(
+        default=None, description="teto_nr - nr_comprometido"
+    )
+
+
+class OucabSnapshotOut(BaseModel):
+    """
+    Snapshot OUCAB com 6 séries por setor e indicadores globais do teto R-NI.
+
+    teto_r_nao_inc_global_m2: limite cross-setor de R Não-Incentivado (art. 39 §2
+    da Lei 15.893/2013) — 675.000 m².
+    """
+
+    setores: list[OucabSetorOut]
+    teto_r_nao_inc_global_m2: Decimal = Field(
+        ..., description="Teto global R Não-Incentivado (675.000 m² — art. 39 §2)"
+    )
+    r_nao_inc_consumido_global: Decimal
+    r_nao_inc_disponivel_global: Decimal
+    pct_r_nao_inc_global: float = Field(
+        ..., description="% do teto R-NI já comprometido"
+    )

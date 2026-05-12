@@ -80,6 +80,7 @@ interface ChartEntry {
   consNR: number;
   dispNR: number;
   overNR: number;
+  overR: number;
   _pctR: number;
   _pctNR: number;
   _setorNome: string;
@@ -107,6 +108,9 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
       <p style={{ margin: "2px 0", color: "#B5D4F4" }}>Disponível R: {fmt(e.dispR)} m²</p>
       <p style={{ margin: "6px 0 2px", color: "#1D9E75" }}>Consumido NR: {fmt(e.consNR)} m² ({e._pctNR.toFixed(1)}%)</p>
       <p style={{ margin: "2px 0", color: "#9FE1CB" }}>Disponível NR: {fmt(e.dispNR)} m²</p>
+      {e.overR > 0 && (
+        <p style={{ margin: "2px 0", color: "#E24B4A", fontWeight: 600 }}>Estouro R: {fmt(e.overR)} m²</p>
+      )}
       {e.overNR > 0 && (
         <p style={{ margin: "2px 0", color: "#E24B4A", fontWeight: 600 }}>Estouro NR: {fmt(e.overNR)} m²</p>
       )}
@@ -136,6 +140,7 @@ const GraficoEstoqueSetores: React.FC<Props> = ({ setores }) => {
       consNR: d.consNR > d.maxNR ? d.maxNR : d.consNR,
       dispNR: d.dispNR,
       overNR: d.overNR,
+      overR: d.overR,
       _pctR: d.pctR,
       _pctNR: d.pctNR,
       _setorNome: s.nome,

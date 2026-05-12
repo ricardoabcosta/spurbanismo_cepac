@@ -82,6 +82,9 @@ MIGRATION_ORDER = [
     "027_seed_setor_estoque_lei.sql",
     "028_proposta_lei_beneficios.sql",
     "029_ampliar_interessado.sql",
+    "030_setores_oucab_completos.sql",
+    "031_setor_estoque_lei_oucab_novos.sql",
+    "032_proposta_aca_r_incentivado.sql",
 ]
 
 

@@ -188,6 +188,8 @@ export default function NovaPropostaPage() {
   const [usoAca, setUsoAca] = useState<"R" | "NR" | "MISTO" | "">("");
   const [acaRm2, setAcaRm2] = useState("");
   const [acaNrm2, setAcaNrm2] = useState("");
+  // OUCAB: tipo residencial (INC = Incentivado, NAO_INC = Não-Incentivado)
+  const [acaRTipo, setAcaRTipo] = useState<"INC" | "NAO_INC" | "">("");
 
   // Etapa 3 — CEPACs
   const [cepacAca, setCepacAca] = useState("");
@@ -210,6 +212,9 @@ export default function NovaPropostaPage() {
 
   const seiInvalido = seiTocado && sei !== "" && !validarSEI(sei);
   const tipoContrapartida = TIPO_CONTRAPARTIDA_FIXO;
+
+  const setorObj = setores.find((st) => st.nome === setor);
+  const isOucab = setorObj?.operacao_urbana_id === 3;
 
   // ---------------------------------------------------------------------------
   // Carregar setores ao montar
@@ -252,7 +257,7 @@ export default function NovaPropostaPage() {
     const rascunho = {
       setor, uso, origem, areaM2, endereco,
       dataProposta, tipoInteressado, razaoSocial, cnpj, cpf,
-      usoAca, acaRm2, acaNrm2, cepacAca, cepacParametros,
+      usoAca, acaRm2, acaNrm2, acaRTipo, cepacAca, cepacParametros,
       sei, proposta, observacao,
     };
     sessionStorage.setItem("cepac_nova_proposta_rascunho", JSON.stringify(rascunho));
@@ -281,6 +286,7 @@ export default function NovaPropostaPage() {
       if (r.usoAca) setUsoAca(r.usoAca as "R" | "NR" | "MISTO");
       if (r.acaRm2) setAcaRm2(r.acaRm2);
       if (r.acaNrm2) setAcaNrm2(r.acaNrm2);
+      if (r.acaRTipo) setAcaRTipo(r.acaRTipo as "INC" | "NAO_INC");
       if (r.cepacAca) setCepacAca(r.cepacAca);
       if (r.cepacParametros) setCepacParametros(r.cepacParametros);
       if (r.sei) setSei(r.sei);
@@ -309,6 +315,9 @@ export default function NovaPropostaPage() {
       if (usoAca === "MISTO") {
         if (!acaRm2 || parseFloat(acaRm2) <= 0) return "Informe a Área R (m²) para uso MISTO.";
         if (!acaNrm2 || parseFloat(acaNrm2) <= 0) return "Informe a Área NR (m²) para uso MISTO.";
+      }
+      if (isOucab && uso === "R" && !acaRTipo) {
+        return "Para OUCAB, selecione o tipo de uso residencial: Incentivado ou Não-Incentivado.";
       }
     }
     if (n === 3) {
@@ -350,11 +359,15 @@ export default function NovaPropostaPage() {
 
     setEnviando(true);
     try {
+      const areaNum = parseFloat(areaM2);
+      const oucabRInc = isOucab && uso === "R" && acaRTipo === "INC" ? areaNum : null;
+      const oucabRNaoInc = isOucab && uso === "R" && acaRTipo === "NAO_INC" ? areaNum : null;
+
       const nova = await criarProposta({
         setor,
         uso: uso as "R" | "NR",
         origem: origem as "ACA" | "NUVEM",
-        area_m2: parseFloat(areaM2),
+        area_m2: areaNum,
         numero_processo_sei: sei,
         titulo_ids: Array.from(titulosSelecionados),
         proposta_codigo: proposta || undefined,
@@ -364,6 +377,8 @@ export default function NovaPropostaPage() {
         area_total_nr: usoAca === "MISTO" && acaNrm2 ? parseFloat(acaNrm2) : undefined,
         cepac_aca: cepacAca ? parseInt(cepacAca, 10) : undefined,
         cepac_parametros: cepacParametros ? parseInt(cepacParametros, 10) : undefined,
+        aca_r_inc_m2: oucabRInc,
+        aca_r_nao_inc_m2: oucabRNaoInc,
       });
       sessionStorage.removeItem("cepac_nova_proposta_rascunho");
       navigate(`/propostas/${nova.id}`);
@@ -550,6 +565,43 @@ export default function NovaPropostaPage() {
             </div>
           )}
         </div>
+
+        {/* OUCAB: tipo residencial — só aparece quando setor é OUCAB e uso é R */}
+        {isOucab && uso === "R" && (
+          <div style={s.secao}>
+            <fieldset style={{ border: "1px solid #c7d9f8", borderRadius: 6, padding: "14px 16px", margin: 0, background: "#f0f4ff" }}>
+              <legend style={{ fontSize: "13px", fontWeight: 700, color: "#1a4a8a", padding: "0 6px" }}>
+                Tipo Residencial — OUCAB *
+              </legend>
+              <div style={s.radioGroup}>
+                <label style={s.radioItem}>
+                  <input
+                    type="radio"
+                    name="aca_r_tipo"
+                    value="NAO_INC"
+                    checked={acaRTipo === "NAO_INC"}
+                    onChange={() => setAcaRTipo("NAO_INC")}
+                  />
+                  R Não-Incentivado
+                </label>
+                <label style={s.radioItem}>
+                  <input
+                    type="radio"
+                    name="aca_r_tipo"
+                    value="INC"
+                    checked={acaRTipo === "INC"}
+                    onChange={() => setAcaRTipo("INC")}
+                  />
+                  R Incentivado (HIS/EHIS — art. 5º IX)
+                </label>
+              </div>
+              <p style={{ ...s.hint, marginTop: 8 }}>
+                R Não-Incentivado sujeito ao teto cross-setor de 675.000 m² (art. 39 §2, Lei 15.893/2013).
+                R Incentivado (HIS/EHIS, área 45–50 m²) não computa nesse teto.
+              </p>
+            </fieldset>
+          </div>
+        )}
       </>
     );
   }

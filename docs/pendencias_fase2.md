@@ -1,7 +1,7 @@
 # Pendências Fase 2 — CEPAC SP Urbanismo
 
 > Documento de controle das atividades que restam para finalizar a Fase 2 em produção.
-> Atualizado em: 20/05/2026 (verificação de estado real — CI quebrado desde 06/05, Bloco 6 ainda pendente)
+> Atualizado em: 20/05/2026 (CI restabelecido, OUCAB em produção, Bloco 6 ainda pendente)
 
 ---
 
@@ -25,7 +25,8 @@
 | Blob Storage funcional | ✅ Container criado + API configurada | 02/05/2026 |
 | Gerenciamento de usuários (Bloco 7) | ✅ T22 backend + T23 frontend em produção | 02/05/2026 |
 | Deploy automático CI → Azure | ⏳ Aguarda secret `AZURE_CREDENTIALS` no GitHub | 02/05/2026 |
-| CI/CD — runs após 06/05 | ❌ **5 últimas runs em `failure`** — investigar | 20/05/2026 |
+| CI/CD — runs após 06/05 | ✅ Restabelecido em 5d2d088 (commit fbdd676 verde) | 20/05/2026 |
+| OUCAB em produção | ✅ Migrations 030–032 + carga + deploy sha-fbdd676 | 20/05/2026 |
 | Bloco 6 — Filtro DESVINCULACAO no saldo | ❌ Não implementado (`grep` confirma ausência) | 20/05/2026 |
 
 ---
@@ -427,17 +428,27 @@ incluindo as de desvinculação. Desvinculações devem ser excluídas do consum
 
 ---
 
-## Bloco 9 — CI quebrado desde 06/05/2026 ⏳ PENDENTE
+## Bloco 9 — CI quebrado desde 06/05/2026 ✅ RESOLVIDO
 
-**Detectado em:** 20/05/2026 durante revisão do estado real do projeto.
+**Detectado em:** 20/05/2026 · **Resolvido em:** 20/05/2026 (commit `5d2d088`)
 
-`gh run list --workflow=ci.yml --limit 5` mostra **5 runs consecutivos em `failure`**, incluindo o commit OUCAB `b85d484` (12/05). Último deploy em produção é `sha-25fa659-ab4b` (06/05), portanto:
+### Causa-raiz
 
-- Migrations 030–032 (OUCAB) **não foram aplicadas em produção**.
-- `scripts/carga_oucab.py` **não rodou em produção** (banco tem 13 setores OUCAB, esperado 18; 6 propostas, esperado 7).
-- `PainelOucab.tsx` e campo R-Incentivado no portal **não estão em produção**.
+O commit `b85d484` (Sessão 2 OUCAB) refatorou `src/core/engine/validators/capacity.py` para ler de `solicitacao.limites_ouc.capacidade_global_m2` em vez de uma constante hardcoded. Quando `limites_ouc is None`, o validator passa a fazer **no-op**.
 
-**Ação:** investigar `gh run view <id> --log-failed` para identificar a causa e restabelecer CI verde antes de qualquer deploy OUCAB.
+O helper `make_solicitacao()` em `tests/conftest.py` não populava `limites_ouc`, fazendo o teste `tests/unit/test_t14_uso_misto.py::TestCapacityMisto::test_misto_bloqueado_quando_parcela_nr_excede_global` falhar no CI desde 06/05.
+
+### Correção
+
+Fix cirúrgico nos 3 testes da classe `TestCapacityMisto`: envolver o `SolicitacaoDTO` retornado por `make_solicitacao()` com `dataclasses.replace(..., limites_ouc=LIMITES_OUCAE)`. Constante `LIMITES_OUCAE` adicionada ao topo do arquivo. Sem alterações em `conftest.py`.
+
+### Estado após o fix (commit `fbdd676`)
+
+- ✅ 9 de 10 jobs do CI verdes (Lint, Mypy, Unit Tests, Integration Tests, Build das 3 imagens)
+- ❌ Job `Deploy to Azure Container Apps` ainda falha — secret `AZURE_CREDENTIALS` ausente (Bloco 8)
+- ✅ Migrations 030–032 aplicadas manualmente em produção (20/05)
+- ✅ `scripts/carga_oucab.py` executado: 18 setores OUCAB, 7 certidões, 152.985,48 m² R Não-Inc + 4.380,03 m² NR confirmados
+- ✅ Deploy manual `sha-fbdd676` nos 3 Container Apps (`./scripts/deploy.sh sha-fbdd676`) — todos `Healthy`
 
 ---
 

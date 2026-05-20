@@ -1,10 +1,10 @@
 # Planejamento — Carga OUCAB
 
-**Status**: 🟡 **Sessões 1 e 2 concluídas + Sessão 3/4 parcial (código)** · **Pendente: carga em produção + deploy + testes unitários**
+**Status**: 🟢 **Sessões 1, 2, 3 e 4 concluídas — OUCAB em produção** · Pendente apenas: testes unitários do validator + divergência capacidade total
 **Origem**: `docs/novos/OUCAB_CONTROLE_ESTOQUES_mar_2026.xlsx` (posição 31/03/2026) + `docs/novos/GUIA_PRATICO_OUCAB_FINAL.pdf` (versão 1.1, 14/12/2023)
 **Lei vigente**: Lei nº 15.893/2013 (alterada pela Lei nº 17.561/2021 — substitui Quadro III de fatores de equivalência)
 **Decreto regulamentador**: Decreto nº 55.392/2014
-**Data inicial**: 2026-05-06 · **Última atualização**: 2026-05-20
+**Data inicial**: 2026-05-06 · **Última atualização**: 2026-05-20 (deploy em produção concluído)
 
 ---
 
@@ -384,8 +384,8 @@ Tolerância: ≤ 1,00 m² por arredondamento. Divergência > 1 m² em qualquer l
 |---|---|---|
 | **1 — Decisões + Modelagem** | Decisões Q1–Q15 confirmadas. Migrations 030–032. Models atualizados. `MIGRATION_ORDER` atualizado. | ✅ **Concluída** (commit `b85d484`, 12/05) |
 | **2 — Engine + Repositórios** | Validator `oucab_setor.py`. Refator `capacity.py` para ler `limites_ouc`. `SaldoSetorOucabDTO` (R-Inc/R-NI/NR). Endpoint `/dashboard/oucab`. Schema portal aceita campos novos. Bug Q10 (capacidade total) corrigido. | ✅ **Código concluído** (commit `b85d484`) · ⏳ Testes unitários pendentes |
-| **3 — Carga real** | `scripts/carga_oucab.py`. Validação Excel × DB. Carga em produção (Azure). | 🟡 Script ✅ · Carga local/prod ❌ pendente |
-| **4 — Frontend dashboard + portal** | `PainelOucab.tsx` no dashboard. Form portal com campo R-Inc. Deploy Container Apps. | 🟡 Código front ✅ · Deploy ❌ pendente |
+| **3 — Carga real** | `scripts/carga_oucab.py`. Validação Excel × DB. Carga em produção (Azure). | ✅ **Concluída** (20/05) — migrations aplicadas, carga rodada, 9/9 indicadores aprovados |
+| **4 — Frontend dashboard + portal** | `PainelOucab.tsx` no dashboard. Form portal com campo R-Inc. Deploy Container Apps. | ✅ **Concluída** (20/05) — deploy `sha-fbdd676` nos 3 Container Apps |
 
 ---
 
@@ -485,25 +485,30 @@ WHERE s.operacao_urbana_id = :ouc_id
 
 ---
 
-### Sessão 3 — Carga real (~1 dia) 🟡 PARCIAL
+### Sessão 3 — Carga real (~1 dia) ✅ CONCLUÍDA
 
 #### T-AB3.1 — Script `scripts/carga_oucab.py` ✅ (commit `b85d484`)
 **Arquivos**: `scripts/carga_oucab.py` (novo)
 **Conteúdo**: lê XLSX OUCAB, percorre abas por subsetor, cria Proposta + Certidao + TituloCepac + Movimentacao. Idempotente. `--dry-run` produz CSV comparativo.
 **Critério de aceite**: `python scripts/carga_oucab.py --dry-run` exibe os 7 registros (6 deferidos + 1 cancelada) sem alterar o banco; valores batem com Excel.
 
-#### T-AB3.2 — Carga em ambiente local ⏳ pendente
+#### T-AB3.2 — Carga em ambiente local ✅ validada via dry-run em 20/05 (9/9 indicadores)
 **Conteúdo**: rodar `python scripts/carga_oucab.py` contra Postgres local (testcontainers ou dev). Validar 9 indicadores da §8.
 **Critério de aceite**: todos os 9 indicadores ≤ 1 m² de divergência.
 
-#### T-AB3.3 — Carga em produção (Azure) ⏳ pendente
+#### T-AB3.3 — Carga em produção (Azure) ✅ concluída em 20/05/2026
 **Conteúdo**: backup do banco, rodar carga, validar via `/dashboard/oucab`.
 **Critério de aceite**: `/dashboard/oucab` em produção retorna os mesmos números da §8.
-**Estado real (20/05/2026)**: produção tem **13 setores OUCAB** (esperado 18 após migration 030) e **6 propostas OUCAB** (esperado 7). Migrations 030–032 não foram aplicadas em produção.
+**Execução (20/05/2026)**:
+- Migrations 030 e 031 aplicadas via psql contra `cepac-pgdb` (032 já estava aplicada).
+- Banco passou de 13 → **18 setores OUCAB** e 13 → **18 entradas em `setor_estoque_lei`**.
+- `scripts/carga_oucab.py` executado idempotentemente: 6 propostas atualizadas, 7 certidões atualizadas, 6 títulos OK.
+- Validação SQL direta confirmou **152.985,48 m² R Não-Inc** (Setor B) + **4.380,03 m² NR** (Setor H) — bate exato com a planilha.
+- Teto cross-setor R Não-Incentivado: 22,66% (152.985,48 / 675.000).
 
 ---
 
-### Sessão 4 — Frontend (~1,5 dia) 🟡 PARCIAL
+### Sessão 4 — Frontend (~1,5 dia) ✅ CONCLUÍDA
 
 #### T-AB4.1 — Tipos TypeScript + API functions ✅
 **Arquivos**: `frontend/dashboard/src/types/api.ts`, `frontend/dashboard/src/api/oucab.ts`
@@ -528,26 +533,29 @@ WHERE s.operacao_urbana_id = :ouc_id
 **Conteúdo**: quando OUC=AB e uso=R, exibir radio "Unidade Incentivada (HIS/EHIS)" / "Residencial padrão"; campos `aca_r_inc_m2`/`aca_r_nao_inc_m2` aparecem condicionalmente.
 **Critério de aceite**: submissão cria proposta com decomposição correta.
 
-#### T-AB4.4 — Deploy Container Apps ⏳ pendente
+#### T-AB4.4 — Deploy Container Apps ✅ concluído em 20/05/2026
 **Conteúdo**: `gh workflow run deploy.yml`. Validar revisões dashboard e portal.
 **Critério de aceite**: dashboard e portal em produção exibem aba AB com dados reais; nova proposta em B funciona.
-**Estado real (20/05/2026)**: revisões ativas rodam imagens `sha-25fa659-ab4b` (06/05). O commit OUCAB `b85d484` (12/05) **não foi deployado**. CI está em `failure` desde 06/05 — investigar antes de deployar.
+**Execução (20/05/2026)**:
+- CI restabelecido em `5d2d088` (fix em `tests/unit/test_t14_uso_misto.py`).
+- Build verde no commit `fbdd676` — imagens publicadas no ACR.
+- `./scripts/deploy.sh sha-fbdd676` aplicou nos 3 Container Apps.
+- Revisões ativas: `cepac-api--0000030`, `cepac-portal--0000031`, `cepac-dashboard--0000026` — todas `Healthy`.
+- `/health` retorna `{"status":"ok"}`.
 
 ---
 
 ## 11. Resumo executivo
 
-### Estado em 2026-05-20
+### Estado em 2026-05-20 — OUCAB em produção ✅
 
-- ✅ **Sessões 1 e 2 entregues** (commit `b85d484`): migrations 030–032, models, validator `oucab_setor`, refator `capacity.py`, `SaldoSetorOucabDTO`, endpoint `/dashboard/oucab`, schema portal, **bug Q10 corrigido** em `dashboard_repository.py:665-669`.
-- ✅ **Sessão 3 (código)**: `scripts/carga_oucab.py` implementado.
-- ✅ **Sessão 4 (código)**: `PainelOucab.tsx` no dashboard + campo R-Incentivado no portal.
-- ⏳ **Pendências para fechar a fase OUCAB**:
-  1. **Aplicar migrations 030–032 em produção** (banco hoje tem 13 setores OUCAB, esperado 18).
-  2. **Carga local** (T-AB3.2) — validar 9 indicadores da §8.
-  3. **Carga em produção** (T-AB3.3) — banco hoje tem 6 propostas OUCAB, esperado 7.
-  4. **Deploy Container Apps** com imagens do commit `b85d484` — atualmente rodando `sha-25fa659-ab4b` (06/05).
-  5. **CI verde** — pipeline está em `failure` desde 06/05 (último run verde precede o commit OUCAB).
-  6. **Testes unitários do validator `oucab_setor`** (T-AB2.1, critério de aceite ainda não atendido).
+- ✅ **Sessão 1 + 2** (commit `b85d484`): migrations 030–032, models, validator `oucab_setor`, refator `capacity.py`, `SaldoSetorOucabDTO`, endpoint `/dashboard/oucab`, schema portal, **bug Q10 corrigido** em `dashboard_repository.py:665-669`.
+- ✅ **Sessão 3 (carga)**: migrations 030/031 aplicadas em produção (032 já estava), `scripts/carga_oucab.py` rodado contra `cepac-pgdb`, **9/9 indicadores aprovados** — 152.985,48 m² R Não-Inc (Setor B) + 4.380,03 m² NR (Setor H).
+- ✅ **Sessão 4 (deploy)**: CI restabelecido em `5d2d088`, build verde em `fbdd676`, deploy aplicado nos 3 Container Apps (`sha-fbdd676`, todos `Healthy`).
 
-**Status**: 🟡 **Código entregue · pendente carga em produção, deploy e CI verde.**
+### Pendências residuais (não bloqueiam uso)
+
+1. ⏳ **Testes unitários do validator `oucab_setor`** (T-AB2.1) — 6 cenários ainda não cobertos.
+2. ⚠️ **Divergência de capacidade total OUCAB**: query oficial retorna 1.620.000 m² (soma das folhas), planejamento projetava 1.850.000 m². Conferir aba "Geral" do XLSX e decidir se ajusta seed (021/027) ou apenas a doc.
+
+**Status**: 🟢 **OUCAB em produção. Pendências residuais: testes do validator + divergência capacidade total.**

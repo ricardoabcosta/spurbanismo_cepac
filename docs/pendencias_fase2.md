@@ -1,7 +1,7 @@
 # Pendências Fase 2 — CEPAC SP Urbanismo
 
 > Documento de controle das atividades que restam para finalizar a Fase 2 em produção.
-> Atualizado em: 02/05/2026 (Bloco 7 concluído — gerenciamento de usuários via portal)
+> Atualizado em: 20/05/2026 (verificação de estado real — CI quebrado desde 06/05, Bloco 6 ainda pendente)
 
 ---
 
@@ -25,6 +25,8 @@
 | Blob Storage funcional | ✅ Container criado + API configurada | 02/05/2026 |
 | Gerenciamento de usuários (Bloco 7) | ✅ T22 backend + T23 frontend em produção | 02/05/2026 |
 | Deploy automático CI → Azure | ⏳ Aguarda secret `AZURE_CREDENTIALS` no GitHub | 02/05/2026 |
+| CI/CD — runs após 06/05 | ❌ **5 últimas runs em `failure`** — investigar | 20/05/2026 |
+| Bloco 6 — Filtro DESVINCULACAO no saldo | ❌ Não implementado (`grep` confirma ausência) | 20/05/2026 |
 
 ---
 
@@ -421,7 +423,21 @@ incluindo as de desvinculação. Desvinculações devem ser excluídas do consum
 - `src/core/repositories/dashboard_repository.py` — `calcular_ocupacao_setores()`
 - Testes correspondentes
 
-**Estado:** planejado, não implementado.
+**Estado (verificado em 20/05/2026):** ❌ planejado, **não implementado** — `grep -n DESVINCULACAO` nos dois arquivos não retorna nada.
+
+---
+
+## Bloco 9 — CI quebrado desde 06/05/2026 ⏳ PENDENTE
+
+**Detectado em:** 20/05/2026 durante revisão do estado real do projeto.
+
+`gh run list --workflow=ci.yml --limit 5` mostra **5 runs consecutivos em `failure`**, incluindo o commit OUCAB `b85d484` (12/05). Último deploy em produção é `sha-25fa659-ab4b` (06/05), portanto:
+
+- Migrations 030–032 (OUCAB) **não foram aplicadas em produção**.
+- `scripts/carga_oucab.py` **não rodou em produção** (banco tem 13 setores OUCAB, esperado 18; 6 propostas, esperado 7).
+- `PainelOucab.tsx` e campo R-Incentivado no portal **não estão em produção**.
+
+**Ação:** investigar `gh run view <id> --log-failed` para identificar a causa e restabelecer CI verde antes de qualquer deploy OUCAB.
 
 ---
 

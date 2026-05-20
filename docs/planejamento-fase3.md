@@ -112,10 +112,10 @@ Ordem: B5 → B6 ‖ B7 (paralelas) → B8 → B9
 
 Após Blocos A e B completos (paralelos entre si):
 
-| # | Task | Entregáveis | Complexidade |
+| # | Task | Entregáveis | Status |
 |---|------|------------|:---:|
-| C10 | Testes integração backend | `test_admin_operacoes_urbanas.py`, `test_admin_setores_v2.py`, `test_portal_propostas_filtro_ouc.py` | M |
-| C11 | Code review | RBAC, ausência de N+1 nas queries novas, contrato backward-compat de `GET /admin/setores` | P |
+| C10 | Testes integração backend | `test_admin_operacoes_urbanas.py`, `test_admin_setores_v2.py`, `test_portal_propostas_filtro_ouc.py` | ✅ criados em `tests/integration/` |
+| C11 | Code review | RBAC, ausência de N+1 nas queries novas, contrato backward-compat de `GET /admin/setores` | ⏳ |
 
 ---
 

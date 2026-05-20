@@ -1,10 +1,10 @@
 # Planejamento — Carga OUCAB
 
-**Status**: 🟢 **Decisões Q1–Q13 confirmadas — pronto para iniciar Sessão 1**
+**Status**: 🟡 **Sessões 1 e 2 concluídas + Sessão 3/4 parcial (código)** · **Pendente: carga em produção + deploy + testes unitários**
 **Origem**: `docs/novos/OUCAB_CONTROLE_ESTOQUES_mar_2026.xlsx` (posição 31/03/2026) + `docs/novos/GUIA_PRATICO_OUCAB_FINAL.pdf` (versão 1.1, 14/12/2023)
 **Lei vigente**: Lei nº 15.893/2013 (alterada pela Lei nº 17.561/2021 — substitui Quadro III de fatores de equivalência)
 **Decreto regulamentador**: Decreto nº 55.392/2014
-**Data**: 2026-05-06
+**Data inicial**: 2026-05-06 · **Última atualização**: 2026-05-20
 
 ---
 
@@ -380,25 +380,25 @@ Tolerância: ≤ 1,00 m² por arredondamento. Divergência > 1 m² em qualquer l
 
 ## 10. Plano de execução em 4 sessões
 
-| Sessão | Entregas | Bloqueios |
+| Sessão | Entregas | Status |
 |---|---|---|
-| **1 — Decisões + Modelagem** | Confirmar Q1–Q8 com cliente. Migrations 030–032. Atualizar models. Atualizar `MIGRATION_ORDER` em conftest. | Aguarda respostas Q1–Q8 |
-| **2 — Engine + Repositórios** | Novo validator `oucab_setor.py`. Refator `capacity.py` para ler `limites_ouc`. Repositório agregando R-Inc/R-NI/NR. Endpoint `/dashboard/oucab`. Testes unitários dos validators. | S1 |
-| **3 — Carga real** | `scripts/carga_oucab.py` com `--dry-run`. Validação Excel × DB. Carga em produção (Azure). | S2 |
-| **4 — Frontend dashboard + portal** | Aba OUCAB no dashboard (Big Numbers + tabela). Form portal com toggle R-Inc / R-Não-Inc. Deploy Container Apps. | S3 |
+| **1 — Decisões + Modelagem** | Decisões Q1–Q15 confirmadas. Migrations 030–032. Models atualizados. `MIGRATION_ORDER` atualizado. | ✅ **Concluída** (commit `b85d484`, 12/05) |
+| **2 — Engine + Repositórios** | Validator `oucab_setor.py`. Refator `capacity.py` para ler `limites_ouc`. `SaldoSetorOucabDTO` (R-Inc/R-NI/NR). Endpoint `/dashboard/oucab`. Schema portal aceita campos novos. Bug Q10 (capacidade total) corrigido. | ✅ **Código concluído** (commit `b85d484`) · ⏳ Testes unitários pendentes |
+| **3 — Carga real** | `scripts/carga_oucab.py`. Validação Excel × DB. Carga em produção (Azure). | 🟡 Script ✅ · Carga local/prod ❌ pendente |
+| **4 — Frontend dashboard + portal** | `PainelOucab.tsx` no dashboard. Form portal com campo R-Inc. Deploy Container Apps. | 🟡 Código front ✅ · Deploy ❌ pendente |
 
 ---
 
 ## TASKS
 
-### Sessão 1 — Decisões + Modelagem (~1 dia)
+### Sessão 1 — Decisões + Modelagem (~1 dia) ✅ CONCLUÍDA
 
-#### T-AB1.1 — Confirmação de decisões com o cliente
+#### T-AB1.1 — Confirmação de decisões com o cliente ✅
 **Owner**: Tech Lead · **Bloqueia**: todas as outras tasks
 **Entregáveis**: ata de decisão Q1–Q8 atualizada neste documento.
 **Critério de aceite**: todas as 8 questões respondidas e este documento atualizado com a decisão.
 
-#### T-AB1.2 — Migration 030: setores ausentes + correção de Fe
+#### T-AB1.2 — Migration 030: setores ausentes + correção de Fe ✅ (commit `b85d484`, **não aplicada em produção**)
 **Arquivos**: `migrations/030_setores_oucab_completos.sql`
 **Conteúdo**:
 - INSERT setores A1, A2, D, I, I2 (todos com estoque 0; A1, A2, I2 com `setor_pai_id` apontando para A e I; D standalone).
@@ -408,31 +408,31 @@ Tolerância: ≤ 1,00 m² por arredondamento. Divergência > 1 m² em qualquer l
 - DO $$...$$ valida 18 setores OUCAB no final.
 **Critério de aceite**: `SELECT COUNT(*) FROM setor WHERE operacao_urbana_id = 3` retorna 18.
 
-#### T-AB1.3 — Migration 031: setor_estoque_lei para novos setores
+#### T-AB1.3 — Migration 031: setor_estoque_lei para novos setores ✅ (commit `b85d484`, **não aplicada em produção**)
 **Arquivos**: `migrations/031_setor_estoque_lei_oucab_novos.sql`
 **Conteúdo**: INSERT em `setor_estoque_lei` para A1, A2, D, I, I2 vinculados a `lei_ouc.id` da 15.893/2013, todos com estoque 0 (exceto I que herda 70.000 R + 0 nR).
 **Critério de aceite**: `SELECT COUNT(*) FROM setor_estoque_lei sel JOIN lei_ouc lo ON sel.lei_ouc_id = lo.id WHERE lo.operacao_urbana_id = 3` = 18.
 
-#### T-AB1.4 — Migration 032: proposta — campos R Incentivado/Não-Inc
+#### T-AB1.4 — Migration 032: proposta — campos R Incentivado/Não-Inc ✅ (commit `b85d484`, **não aplicada em produção**)
 **Arquivos**: `migrations/032_proposta_aca_r_incentivado.sql`
 **Conteúdo**: ALTER TABLE proposta ADD COLUMN `aca_r_inc_m2 NUMERIC(15,2) NULL`, `aca_r_nao_inc_m2 NUMERIC(15,2) NULL`.
 **Critério de aceite**: schema atualizado; campos NULL para todas as propostas existentes (OUCAE/OUCFL não preenchem).
 
-#### T-AB1.5 — Atualizar models SQLAlchemy
+#### T-AB1.5 — Atualizar models SQLAlchemy ✅
 **Arquivos**: `src/core/models/proposta.py`
 **Conteúdo**: adicionar mappings dos 2 campos novos.
 **Critério de aceite**: `SELECT aca_r_inc_m2 FROM proposta` funciona via SQLAlchemy.
 
-#### T-AB1.6 — Atualizar MIGRATION_ORDER
+#### T-AB1.6 — Atualizar MIGRATION_ORDER ✅
 **Arquivos**: `tests/integration/conftest.py`
 **Conteúdo**: incluir 030, 031, 032 na lista ordenada.
 **Critério de aceite**: `pytest tests/integration` passa.
 
 ---
 
-### Sessão 2 — Engine + Repositórios (~2 dias)
+### Sessão 2 — Engine + Repositórios (~2 dias) ✅ CÓDIGO CONCLUÍDO (testes unitários pendentes)
 
-#### T-AB2.0 — Corrigir soma da capacidade total no dashboard (bug Q10)
+#### T-AB2.0 — Corrigir soma da capacidade total no dashboard (bug Q10) ✅ (`dashboard_repository.py:665-669`)
 **Arquivos**: `src/core/repositories/dashboard_repository.py` (e/ou `saldo_repository.py`)
 **Problema atual**: `SUM(estoque_total_m2)` em todos os setores OUCAB duplica o estoque dos pais (A, E, F, I) com seus filhos. Hoje retorna 2.495.000 m²; após Q2 (cadastrar A1/A2/D/I/I2) ficaria 2.565.000 m². Correto = 1.850.000 m².
 **Conteúdo**: alterar a query para somar **somente setores-folha** (que não são pai de nenhum outro):
@@ -453,63 +453,64 @@ WHERE s.operacao_urbana_id = :ouc_id
 - OUCFL → soma dos 4 setores macro (1.756.155 m² — Lei 18.175 vigente) — sem mudança.
 - Teste de regressão para as 3 OUCs.
 
-#### T-AB2.1 — Novo validator `oucab_setor.py`
+#### T-AB2.1 — Novo validator `oucab_setor.py` 🟡 (código ✅ · testes unitários ❌)
 **Arquivos**: `src/core/engine/validators/oucab_setor.py` (novo)
 **Conteúdo**: lê `solicitacao.limites_setor.estoque_total_m2` e `teto_nr_m2` (já parametrizados via `setor_estoque_lei`); bloqueia quando consumido + solicitação > limite.
 **Critério de aceite**: testes unitários para os 6 cenários (R/NR/MISTO × dentro/fora do limite).
 
-#### T-AB2.2 — Refator `capacity.py` para ler de `limites_ouc`
+#### T-AB2.2 — Refator `capacity.py` para ler de `limites_ouc` ✅
 **Arquivos**: `src/core/engine/validators/capacity.py`
 **Conteúdo**: substituir constantes hardcoded por `solicitacao.limites_ouc.capacidade_global_m2`. No-op se NULL. Atualizar `saldo_repository` para popular este campo (já existe ✅).
 **Critério de aceite**: bateria de testes OUCAE continua passando; teste novo OUCAB (1.850.000 m²) bloqueia corretamente.
 
-#### T-AB2.3 — Cadeia de validators OUCAB no engine
+#### T-AB2.3 — Cadeia de validators OUCAB no engine ✅
 **Arquivos**: `src/core/engine/rules_engine.py`
 **Conteúdo**: para cada setor OUCAB, cadeia `[sei, capacity, oucab_setor, r_nao_incentivado, quarantine]`. Mapear todos os 18 setores (incluir A1/A2/D/I/I2 que retornam SETOR_INVALIDO se chegar solicitação — mas isso é via `oucab_setor` que detecta estoque 0).
 **Critério de aceite**: testes de integração do engine cobrem propostas em A1, A2, D — todos retornam erro estruturado.
 
-#### T-AB2.4 — Repositório agregando R-Inc / R-NI / NR
+#### T-AB2.4 — Repositório agregando R-Inc / R-NI / NR ✅ (`SaldoSetorOucabDTO`)
 **Arquivos**: `src/core/repositories/saldo_repository.py`
 **Conteúdo**: novo `SaldoSetorOucabDTO` com 6 campos (r_inc_consumido, r_inc_em_analise, r_nao_inc_consumido, r_nao_inc_em_analise, nr_consumido, nr_em_analise) — agregação por flag `incentivado`.
 **Critério de aceite**: para cada setor OUCAB, `calcular_saldo_oucab(setor_id)` bate com a aba Geral.
 
-#### T-AB2.5 — Endpoint `/dashboard/oucab`
+#### T-AB2.5 — Endpoint `/dashboard/oucab` ✅
 **Arquivos**: `src/api/routes/dashboard.py`, `src/api/schemas/dashboard.py`
 **Conteúdo**: retorna estrutura `{ totals: {...}, setores: [{nome, r_inc_consumido, r_nao_inc_consumido, nr_consumido, r_inc_disponivel, r_nao_inc_disponivel, nr_disponivel}] }`.
 **Critério de aceite**: response bate com a aba Geral da planilha (após carga).
 
-#### T-AB2.6 — Schema Portal aceita campos novos
+#### T-AB2.6 — Schema Portal aceita campos novos ✅
 **Arquivos**: `src/api/schemas/portal.py`
 **Conteúdo**: `PropostaIn` opcional `aca_r_inc_m2`, `aca_r_nao_inc_m2`. Validação: se OUC=AB e uso=R, ao menos um dos dois deve ser > 0.
 **Critério de aceite**: POST com setor B + uso=R + aca_r_inc_m2=100 + aca_r_nao_inc_m2=200 cria proposta com áreas separadas.
 
 ---
 
-### Sessão 3 — Carga real (~1 dia)
+### Sessão 3 — Carga real (~1 dia) 🟡 PARCIAL
 
-#### T-AB3.1 — Script `scripts/carga_oucab.py`
+#### T-AB3.1 — Script `scripts/carga_oucab.py` ✅ (commit `b85d484`)
 **Arquivos**: `scripts/carga_oucab.py` (novo)
 **Conteúdo**: lê XLSX OUCAB, percorre abas por subsetor, cria Proposta + Certidao + TituloCepac + Movimentacao. Idempotente. `--dry-run` produz CSV comparativo.
 **Critério de aceite**: `python scripts/carga_oucab.py --dry-run` exibe os 7 registros (6 deferidos + 1 cancelada) sem alterar o banco; valores batem com Excel.
 
-#### T-AB3.2 — Carga em ambiente local
+#### T-AB3.2 — Carga em ambiente local ⏳ pendente
 **Conteúdo**: rodar `python scripts/carga_oucab.py` contra Postgres local (testcontainers ou dev). Validar 9 indicadores da §8.
 **Critério de aceite**: todos os 9 indicadores ≤ 1 m² de divergência.
 
-#### T-AB3.3 — Carga em produção (Azure)
+#### T-AB3.3 — Carga em produção (Azure) ⏳ pendente
 **Conteúdo**: backup do banco, rodar carga, validar via `/dashboard/oucab`.
 **Critério de aceite**: `/dashboard/oucab` em produção retorna os mesmos números da §8.
+**Estado real (20/05/2026)**: produção tem **13 setores OUCAB** (esperado 18 após migration 030) e **6 propostas OUCAB** (esperado 7). Migrations 030–032 não foram aplicadas em produção.
 
 ---
 
-### Sessão 4 — Frontend (~1,5 dia)
+### Sessão 4 — Frontend (~1,5 dia) 🟡 PARCIAL
 
-#### T-AB4.1 — Tipos TypeScript + API functions
+#### T-AB4.1 — Tipos TypeScript + API functions ✅
 **Arquivos**: `frontend/dashboard/src/types/api.ts`, `frontend/dashboard/src/api/oucab.ts`
 **Conteúdo**: `OucabResumoOut`, `OucabSetorRow`, função `getDashboardOucab()`.
 **Critério de aceite**: chamada à API resolve com tipos.
 
-#### T-AB4.2 — Atualizar aba AB do Dashboard (existente)
+#### T-AB4.2 — Atualizar aba AB do Dashboard (existente) ✅ (`PainelOucab.tsx`, rota `/painel-oucab`)
 **Arquivos**: componente que renderiza o painel quando o toggle AB está ativo (`frontend/dashboard/src/pages/DashboardPage.tsx` ou similar)
 **Conteúdo**:
 - Big Numbers — substituir dados fake atuais (Q7) pelos valores reais do endpoint `/dashboard/oucab`: Capacidade Total · Saldo Geral Disponível · Total Consumido · Em Análise.
@@ -522,29 +523,31 @@ WHERE s.operacao_urbana_id = :ouc_id
 - Gráfico mostra 10 colunas com 6 séries cada.
 - AE/FL preservam comportamento atual (4 séries).
 
-#### T-AB4.3 — Portal: form de nova proposta com R-Inc/R-NI
+#### T-AB4.3 — Portal: form de nova proposta com R-Inc/R-NI ✅ (`NovaPropostaPage.tsx`)
 **Arquivos**: `frontend/portal/src/components/NovaProposta.tsx`
 **Conteúdo**: quando OUC=AB e uso=R, exibir radio "Unidade Incentivada (HIS/EHIS)" / "Residencial padrão"; campos `aca_r_inc_m2`/`aca_r_nao_inc_m2` aparecem condicionalmente.
 **Critério de aceite**: submissão cria proposta com decomposição correta.
 
-#### T-AB4.4 — Deploy Container Apps
+#### T-AB4.4 — Deploy Container Apps ⏳ pendente
 **Conteúdo**: `gh workflow run deploy.yml`. Validar revisões dashboard e portal.
 **Critério de aceite**: dashboard e portal em produção exibem aba AB com dados reais; nova proposta em B funciona.
+**Estado real (20/05/2026)**: revisões ativas rodam imagens `sha-25fa659-ab4b` (06/05). O commit OUCAB `b85d484` (12/05) **não foi deployado**. CI está em `failure` desde 06/05 — investigar antes de deployar.
 
 ---
 
 ## 11. Resumo executivo
 
-- A OUCAB **já tem boa parte da infraestrutura pronta** no sistema (lei, setores, hierarquia, flag incentivado, teto cross-setor de 675K, toggle AB no dashboard).
-- **Lacunas pequenas mas críticas**:
-  - Fatores Fe errados (Quadro III da Lei 17.561/2021 não foi seguido).
-  - 5 setores ausentes (A1, A2, D, I, I2).
-  - **Bug Q10**: capacidade total no dashboard duplica setores-pai → exibe 2.495.000 em vez de 1.850.000 m².
-  - Falta validator de teto setorial OUCAB.
-  - `capacity.py` hardcoded para OUCAE.
-  - `proposta` não distingue R-Inc / R-Não-Inc.
-- **Dashboard aba AB já existe** com toggle e gráfico mas mostra dados fake e usa só 4 séries (precisa 6 para OUCAB — Q8).
-- **Carga é trivial em volume** (7 registros, 1 deles com 2 certidões — AB-0096) — o esforço está nas adequações de modelo/regras antes da carga.
-- **Plano em 4 sessões (~5,5 dias úteis)** com **19 tasks numeradas** (T-AB1.1–T-AB1.6, T-AB2.0–T-AB2.6, T-AB3.1–T-AB3.3, T-AB4.1–T-AB4.4), todas as decisões Q1–Q15 confirmadas, critérios de aceite verificáveis.
+### Estado em 2026-05-20
 
-**Status**: 🟢 **Pronto para iniciar Sessão 1.**
+- ✅ **Sessões 1 e 2 entregues** (commit `b85d484`): migrations 030–032, models, validator `oucab_setor`, refator `capacity.py`, `SaldoSetorOucabDTO`, endpoint `/dashboard/oucab`, schema portal, **bug Q10 corrigido** em `dashboard_repository.py:665-669`.
+- ✅ **Sessão 3 (código)**: `scripts/carga_oucab.py` implementado.
+- ✅ **Sessão 4 (código)**: `PainelOucab.tsx` no dashboard + campo R-Incentivado no portal.
+- ⏳ **Pendências para fechar a fase OUCAB**:
+  1. **Aplicar migrations 030–032 em produção** (banco hoje tem 13 setores OUCAB, esperado 18).
+  2. **Carga local** (T-AB3.2) — validar 9 indicadores da §8.
+  3. **Carga em produção** (T-AB3.3) — banco hoje tem 6 propostas OUCAB, esperado 7.
+  4. **Deploy Container Apps** com imagens do commit `b85d484` — atualmente rodando `sha-25fa659-ab4b` (06/05).
+  5. **CI verde** — pipeline está em `failure` desde 06/05 (último run verde precede o commit OUCAB).
+  6. **Testes unitários do validator `oucab_setor`** (T-AB2.1, critério de aceite ainda não atendido).
+
+**Status**: 🟡 **Código entregue · pendente carga em produção, deploy e CI verde.**

@@ -6,12 +6,20 @@ de cada validator setorial quando a solicitação tem uso=MISTO.
 
 Premissa: uso=MISTO divide area_m2 igualmente (50% NR + 50% R).
 """
+from dataclasses import replace
 from decimal import Decimal
 from uuid import uuid4
 
 
-from src.core.engine.dtos import SaldoSetorDTO, SolicitacaoDTO, TituloDTO
+from src.core.engine.dtos import LimitesOucDTO, SaldoSetorDTO, SolicitacaoDTO, TituloDTO
 from tests.conftest import make_solicitacao
+
+
+LIMITES_OUCAE = LimitesOucDTO(
+    teto_r_nao_incentivado_m2=None,
+    r_nao_inc_consumido_global=Decimal("0.00"),
+    capacidade_global_m2=Decimal("4600000.00"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -180,9 +188,12 @@ class TestCapacityMisto:
         NR setorial Jabaquara = 100 m² → não activa o teto setorial (175.000).
         """
         saldo = self._saldo_jabaquara_com_global_alto(Decimal("4599000.00"))
-        sol = make_solicitacao(
-            setor="Jabaquara", uso="MISTO",
-            area_m2=Decimal("1000.00"), saldo_setor=saldo,
+        sol = replace(
+            make_solicitacao(
+                setor="Jabaquara", uso="MISTO",
+                area_m2=Decimal("1000.00"), saldo_setor=saldo,
+            ),
+            limites_ouc=LIMITES_OUCAE,
         )
         resultado = engine.validar(sol)
         assert resultado.aprovado, resultado.erro
@@ -193,9 +204,12 @@ class TestCapacityMisto:
         MISTO 1.000 m² → parcela NR = 500 m² > 200 disponível → TETO_GLOBAL_EXCEDIDO.
         """
         saldo = self._saldo_jabaquara_com_global_alto(Decimal("4599800.00"))
-        sol = make_solicitacao(
-            setor="Jabaquara", uso="MISTO",
-            area_m2=Decimal("1000.00"), saldo_setor=saldo,
+        sol = replace(
+            make_solicitacao(
+                setor="Jabaquara", uso="MISTO",
+                area_m2=Decimal("1000.00"), saldo_setor=saldo,
+            ),
+            limites_ouc=LIMITES_OUCAE,
         )
         resultado = engine.validar(sol)
         assert not resultado.aprovado
@@ -204,9 +218,12 @@ class TestCapacityMisto:
     def test_r_puro_nao_limitado_pelo_global(self, engine):
         """R puro não é limitado pelo teto global — mesmo com consumo_total_global no limite."""
         saldo = self._saldo_jabaquara_com_global_alto(Decimal("4599999.00"))
-        sol = make_solicitacao(
-            setor="Jabaquara", uso="R",
-            area_m2=Decimal("100000.00"), saldo_setor=saldo,
+        sol = replace(
+            make_solicitacao(
+                setor="Jabaquara", uso="R",
+                area_m2=Decimal("100000.00"), saldo_setor=saldo,
+            ),
+            limites_ouc=LIMITES_OUCAE,
         )
         resultado = engine.validar(sol)
         assert resultado.aprovado, resultado.erro
